@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Qurilish Mollari Do'koni</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginSahifa" class="login-wrapper">
+  <div class="login-box">
+    <div class="login-logo">
+      <i class="fas fa-hard-hat"></i>
+      <h1>Qurilish Do'koni</h1>
+      <p>Boshqaruv tizimi</p>
+    </div>
+    <form id="loginForm">
+      <div class="form-group">
+        <label><i class="fas fa-user"></i> Username</label>
+        <input type="text" id="loginUsername" placeholder="Username kiriting" required>
+      </div>
+      <div class="form-group">
+        <label><i class="fas fa-lock"></i> Parol</label>
+        <div class="parol-wrapper">
+          <input type="password" id="loginParol" placeholder="Parol kiriting" required>
+          <i class="fas fa-eye" id="kozsatBtn" onclick="parolKorsatYashir()"></i>
+        </div>
+      </div>
+      <div id="loginXato" class="xato-xabar" style="display:none"></div>
+      <button type="submit" class="btn-kirish">
+        <i class="fas fa-sign-in-alt"></i> Kirish
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- ASOSIY ILOVA -->
+<div id="asosiyIlova" style="display:none">
+  <!-- SIDEBAR -->
+  <nav id="sidebar" class="sidebar">
+    <div class="sidebar-header">
+      <i class="fas fa-hard-hat"></i>
+      <span class="sidebar-title">Qurilish Do'koni</span>
+      <button class="sidebar-close" onclick="sidebarToggle()"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="sidebar-user">
+      <div class="user-avatar"><i class="fas fa-user-circle"></i></div>
+      <div>
+        <div id="sidebarUserIsm" class="user-ism"></div>
+        <div id="sidebarUserRol" class="user-rol"></div>
+      </div>
+    </div>
+    <ul class="sidebar-menu">
+      <li onclick="sahifaOch('dashboard')" id="menu-dashboard" class="active">
+        <i class="fas fa-tachometer-alt"></i><span>Dashboard</span>
+      </li>
+      <li onclick="sahifaOch('kassa')" id="menu-kassa">
+        <i class="fas fa-cash-register"></i><span>Kassa / Sotuv</span>
+      </li>
+      <li onclick="sahifaOch('mahsulotlar')" id="menu-mahsulotlar">
+        <i class="fas fa-boxes"></i><span>Mahsulotlar</span>
+      </li>
+      <li onclick="sahifaOch('ombor')" id="menu-ombor">
+        <i class="fas fa-warehouse"></i><span>Ombor</span>
+      </li>
+      <li onclick="sahifaOch('hisobot')" id="menu-hisobot">
+        <i class="fas fa-chart-bar"></i><span>Hisobotlar</span>
+      </li>
+      <li onclick="sahifaOch('xodimlar')" id="menu-xodimlar" class="admin-only" style="display:none">
+        <i class="fas fa-users"></i><span>Xodimlar</span>
+      </li>
+    </ul>
+    <div class="sidebar-bottom">
+      <button onclick="chiqish()" class="btn-chiqish">
+        <i class="fas fa-sign-out-alt"></i><span>Chiqish</span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- OVERLAY -->
+  <div id="overlay" class="overlay" onclick="sidebarToggle()"></div>
+
+  <!-- ASOSIY KONTENT -->
+  <div class="main-wrapper">
+    <header class="topbar">
+      <button class="menu-btn" onclick="sidebarToggle()"><i class="fas fa-bars"></i></button>
+      <h2 id="sahifaNomi">Dashboard</h2>
+      <div class="topbar-right">
+        <span id="topbarSana" class="sana"></span>
+        <span id="topbarUser" class="topbar-user"></span>
+      </div>
+    </header>
+
+    <main id="asosiyKontent" class="main-content">
+      <!-- Sahifalar JS orqali yuklanadi -->
+    </main>
+  </div>
+</div>
+
+<!-- MODAL -->
+<div id="modal" class="modal" style="display:none">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3 id="modalSarlavha"></h3>
+      <button onclick="modalYop()" class="modal-close"><i class="fas fa-times"></i></button>
+    </div>
+    <div id="modalKontent" class="modal-kontent"></div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast" class="toast" style="display:none"></div>
+
+<script src="js/api.js"></script>
+<script src="js/dashboard.js"></script>
+<script src="js/mahsulotlar.js"></script>
+<script src="js/kassa.js"></script>
+<script src="js/ombor.js"></script>
+<script src="js/hisobot.js"></script>
+<script src="js/xodimlar.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
