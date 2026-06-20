@@ -1,0 +1,2 @@
+# Python standart kutubxonalar ishlatilgan
+# Qo'shimcha paket kerak emas

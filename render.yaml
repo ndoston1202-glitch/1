@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: qurilish-dokoni
+    env: python
+    plan: free
+    buildCommand: echo "build ok"
+    startCommand: python server.py
+    disk:
+      name: dokoni-db
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: RAILWAY_VOLUME_MOUNT_PATH
+        value: /data
