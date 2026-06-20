@@ -1,5 +1,4 @@
 let mahsulotlarRoyxat = [];
-let mahsulotlarRoyxat = [];
 let kategoriyalarRoyxat = [];
 let joriySahifa = 1;
 const SAHIFADAGI_SON = 20;

@@ -308,3 +308,15 @@ async function mijozCSVYukla() {
 
 // CSV faylni o'qish
 function csvFaylOqi(input, targetId) {
+
+
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    let text = e.target.result;
+    if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+    document.getElementById(targetId).value = text;
+  };
+  reader.readAsText(file, 'UTF-8');
+}
