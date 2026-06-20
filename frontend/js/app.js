@@ -49,7 +49,7 @@ function sahifaOch(nomi) {
 
   const nomlar = {
     dashboard: 'Dashboard', kassa: 'Kassa / Sotuv', mahsulotlar: 'Mahsulotlar',
-    ombor: 'Ombor', hisobot: 'Hisobotlar', xodimlar: 'Xodimlar'
+    ombor: 'Ombor', hisobot: 'Hisobotlar', xodimlar: 'Xodimlar', mijozlar: 'Mijozlar'
   };
   document.getElementById('sahifaNomi').textContent = nomlar[nomi] || nomi;
 
@@ -67,6 +67,7 @@ function sahifaOch(nomi) {
     case 'ombor': omborYukla(); break;
     case 'hisobot': hisobotYukla(); break;
     case 'xodimlar': xodimlarYukla(); break;
+    case 'mijozlar': mijozlarYukla(); break;
   }
 }
 

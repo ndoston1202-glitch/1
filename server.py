@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import json, sqlite3, os, re
+import json, sqlite3, os, re, csv, io
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 from datetime import datetime
@@ -42,11 +42,13 @@ def init_db():
     CREATE TABLE IF NOT EXISTS sotuvlar (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         chek_raqam TEXT UNIQUE NOT NULL, kassir_id INTEGER NOT NULL,
+        mijoz_id INTEGER,
         jami_summa REAL NOT NULL DEFAULT 0, chegirma REAL DEFAULT 0,
         tolov_turi TEXT DEFAULT 'naqd',
         mijoz_ismi TEXT, mijoz_telefon TEXT, izoh TEXT,
         sana TEXT DEFAULT (datetime('now','localtime')),
-        FOREIGN KEY (kassir_id) REFERENCES foydalanuvchilar(id)
+        FOREIGN KEY (kassir_id) REFERENCES foydalanuvchilar(id),
+        FOREIGN KEY (mijoz_id) REFERENCES mijozlar(id)
     );
     CREATE TABLE IF NOT EXISTS sotuv_tafsilotlari (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -66,6 +68,17 @@ def init_db():
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         nomi TEXT NOT NULL, summa REAL NOT NULL, kategoriya TEXT,
         foydalanuvchi_id INTEGER, sana TEXT DEFAULT (datetime('now','localtime')), izoh TEXT
+    );
+    CREATE TABLE IF NOT EXISTS mijozlar (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        ism TEXT NOT NULL,
+        familiya TEXT,
+        telefon TEXT,
+        manzil TEXT,
+        izoh TEXT,
+        qarz REAL DEFAULT 0,
+        yaratilgan TEXT DEFAULT (datetime('now','localtime')),
+        faol INTEGER DEFAULT 1
     );
     """)
     conn.commit()
@@ -167,6 +180,23 @@ class Handler(BaseHTTPRequestHandler):
                 rows = conn.execute("SELECT id,ism,familiya,username,rol,telefon,yaratilgan,faol FROM foydalanuvchilar").fetchall()
                 return self.send_json(rows_to_list(rows))
 
+            # MIJOZLAR
+            if path == '/api/mijozlar':
+                q = qp('qidiruv')
+                if q:
+                    rows = conn.execute("SELECT * FROM mijozlar WHERE faol=1 AND (ism LIKE ? OR familiya LIKE ? OR telefon LIKE ?) ORDER BY ism", (f'%{q}%',f'%{q}%',f'%{q}%')).fetchall()
+                else:
+                    rows = conn.execute("SELECT * FROM mijozlar WHERE faol=1 ORDER BY ism").fetchall()
+                return self.send_json(rows_to_list(rows))
+
+            m = re.match(r'^/api/mijozlar/(\d+)$', path)
+            if m:
+                row = conn.execute("SELECT * FROM mijozlar WHERE id=?", (m.group(1),)).fetchone()
+                if not row: return self.send_error_json('Mijoz topilmadi', 404)
+                sotuvlar = rows_to_list(conn.execute("SELECT s.*,f.ism||' '||f.familiya as kassir_ismi FROM sotuvlar s LEFT JOIN foydalanuvchilar f ON s.kassir_id=f.id WHERE s.mijoz_id=? ORDER BY s.sana DESC LIMIT 20", (m.group(1),)).fetchall())
+                d = row_to_dict(row); d['sotuvlar'] = sotuvlar
+                return self.send_json(d)
+
             # KATEGORIYALAR
             if path == '/api/kategoriyalar':
                 rows = conn.execute("SELECT * FROM kategoriyalar ORDER BY nomi").fetchall()
@@ -199,7 +229,7 @@ class Handler(BaseHTTPRequestHandler):
 
             # SOTUVLAR
             if path == '/api/sotuvlar':
-                sql = "SELECT s.*,f.ism||' '||f.familiya as kassir_ismi FROM sotuvlar s LEFT JOIN foydalanuvchilar f ON s.kassir_id=f.id WHERE 1=1"
+                sql = "SELECT s.*,f.ism||' '||f.familiya as kassir_ismi, COALESCE(mj.ism||' '||COALESCE(mj.familiya,''),'') as mijoz_toliq_ismi FROM sotuvlar s LEFT JOIN foydalanuvchilar f ON s.kassir_id=f.id LEFT JOIN mijozlar mj ON s.mijoz_id=mj.id WHERE 1=1"
                 params = []
                 if qp('boshlanish'): sql += " AND date(s.sana)>=?"; params.append(qp('boshlanish'))
                 if qp('tugash'): sql += " AND date(s.sana)<=?"; params.append(qp('tugash'))
@@ -209,7 +239,7 @@ class Handler(BaseHTTPRequestHandler):
 
             m = re.match(r'^/api/sotuvlar/(\d+)$', path)
             if m:
-                sotuv = conn.execute("SELECT s.*,f.ism||' '||f.familiya as kassir_ismi FROM sotuvlar s LEFT JOIN foydalanuvchilar f ON s.kassir_id=f.id WHERE s.id=?", (m.group(1),)).fetchone()
+                sotuv = conn.execute("SELECT s.*,f.ism||' '||f.familiya as kassir_ismi, COALESCE(mj.ism||' '||COALESCE(mj.familiya,''),'') as mijoz_toliq_ismi FROM sotuvlar s LEFT JOIN foydalanuvchilar f ON s.kassir_id=f.id LEFT JOIN mijozlar mj ON s.mijoz_id=mj.id WHERE s.id=?", (m.group(1),)).fetchone()
                 if not sotuv: return self.send_error_json('Sotuv topilmadi', 404)
                 taf = conn.execute("SELECT st.*,mah.nomi as mahsulot_nomi,mah.birlik FROM sotuv_tafsilotlari st JOIN mahsulotlar mah ON st.mahsulot_id=mah.id WHERE st.sotuv_id=?", (m.group(1),)).fetchall()
                 d = row_to_dict(sotuv); d['tafsilotlar'] = rows_to_list(taf)
@@ -292,8 +322,18 @@ class Handler(BaseHTTPRequestHandler):
                     conn.commit(); return self.send_json({'muvaffaqiyat':True,'id':r})
                 except: return self.send_error_json("Bu kategoriya allaqachon mavjud!")
 
+            if path == '/api/mijozlar':
+                try:
+                    r = conn.execute("INSERT INTO mijozlar (ism,familiya,telefon,manzil,izoh) VALUES (?,?,?,?,?)",
+                        (body['ism'],body.get('familiya',''),body.get('telefon',''),body.get('manzil',''),body.get('izoh',''))).lastrowid
+                    conn.commit(); return self.send_json({'muvaffaqiyat':True,'id':r})
+                except Exception as e: return self.send_error_json(str(e))
+
             if path == '/api/mahsulotlar':
                 try:
+                    # Duplikat tekshiruv — bir xil nomli mahsulot bo'lmasin
+                    mavjud = conn.execute("SELECT id FROM mahsulotlar WHERE LOWER(nomi)=LOWER(?) AND faol=1", (body['nomi'],)).fetchone()
+                    if mavjud: return self.send_error_json(f"'{body['nomi']}' nomli mahsulot allaqachon mavjud!")
                     r = conn.execute("INSERT INTO mahsulotlar (nomi,kategoriya_id,shtrix_kod,birlik,kelish_narxi,sotish_narxi,miqdor,min_miqdor,tavsif) VALUES (?,?,?,?,?,?,?,?,?)",
                         (body['nomi'],body.get('kategoriya_id'),body.get('shtrix_kod'),body.get('birlik','dona'),
                          body.get('kelish_narxi',0),body.get('sotish_narxi',0),body.get('miqdor',0),body.get('min_miqdor',5),body.get('tavsif',''))).lastrowid
@@ -307,16 +347,27 @@ class Handler(BaseHTTPRequestHandler):
                 jami = sum(m['miqdor']*m['narxi'] for m in mahsulotlar)
                 chegirma = body.get('chegirma', 0)
                 yakuniy = jami - chegirma
+                mijoz_id = body.get('mijoz_id')
+                # Mijoz ismi: bazadan olinsin
+                mijoz_ismi = ''
+                if mijoz_id:
+                    mj = conn.execute("SELECT ism,familiya FROM mijozlar WHERE id=?", (mijoz_id,)).fetchone()
+                    if mj: mijoz_ismi = mj['ism'] + (' ' + mj['familiya'] if mj['familiya'] else '')
+                else:
+                    mijoz_ismi = body.get('mijoz_ismi','')
                 for m in mahsulotlar:
                     row = conn.execute("SELECT miqdor,nomi FROM mahsulotlar WHERE id=?", (m['mahsulot_id'],)).fetchone()
                     if not row or row['miqdor'] < m['miqdor']:
                         return self.send_error_json(f"'{row['nomi'] if row else 'Mahsulot'}' omborda yetarli emas! Mavjud: {row['miqdor'] if row else 0}")
-                r = conn.execute("INSERT INTO sotuvlar (chek_raqam,kassir_id,jami_summa,chegirma,tolov_turi,mijoz_ismi,mijoz_telefon,izoh) VALUES (?,?,?,?,?,?,?,?)",
-                    (chek,body['kassir_id'],yakuniy,chegirma,body.get('tolov_turi','naqd'),body.get('mijoz_ismi',''),body.get('mijoz_telefon',''),body.get('izoh',''))).lastrowid
+                r = conn.execute("INSERT INTO sotuvlar (chek_raqam,kassir_id,mijoz_id,jami_summa,chegirma,tolov_turi,mijoz_ismi,mijoz_telefon,izoh) VALUES (?,?,?,?,?,?,?,?,?)",
+                    (chek,body['kassir_id'],mijoz_id,yakuniy,chegirma,body.get('tolov_turi','naqd'),mijoz_ismi,body.get('mijoz_telefon',''),body.get('izoh',''))).lastrowid
                 for m in mahsulotlar:
                     conn.execute("INSERT INTO sotuv_tafsilotlari (sotuv_id,mahsulot_id,miqdor,narxi,jami) VALUES (?,?,?,?,?)",
                         (r, m['mahsulot_id'], m['miqdor'], m['narxi'], m['miqdor']*m['narxi']))
                     conn.execute("UPDATE mahsulotlar SET miqdor=miqdor-?,yangilangan=datetime('now','localtime') WHERE id=?", (m['miqdor'], m['mahsulot_id']))
+                # Qarz bo'lsa mijoz qarzini yangilaymiz
+                if mijoz_id and body.get('tolov_turi') == 'qarz':
+                    conn.execute("UPDATE mijozlar SET qarz=qarz+? WHERE id=?", (yakuniy, mijoz_id))
                 conn.commit()
                 return self.send_json({'muvaffaqiyat':True,'sotuv_id':r,'chek_raqam':chek,'jami_summa':yakuniy})
 
@@ -331,6 +382,57 @@ class Handler(BaseHTTPRequestHandler):
                 conn.execute("INSERT INTO xarajatlar (nomi,summa,kategoriya,foydalanuvchi_id,izoh) VALUES (?,?,?,?,?)",
                     (body['nomi'],body['summa'],body.get('kategoriya',''),body.get('foydalanuvchi_id'),body.get('izoh','')))
                 conn.commit(); return self.send_json({'muvaffaqiyat':True})
+
+            # EXCEL (CSV) IMPORT
+            if path == '/api/import/mahsulotlar':
+                # CSV matn keladi: nomi,birlik,kelish_narxi,sotish_narxi,miqdor,min_miqdor,kategoriya
+                csv_text = body.get('csv','')
+                if not csv_text: return self.send_error_json('CSV ma\'lumot yo\'q!')
+                reader = csv.DictReader(io.StringIO(csv_text))
+                qoshildi = 0; xatolar = []
+                for i, row in enumerate(reader, 2):
+                    nomi = (row.get('nomi') or row.get('Nomi') or '').strip()
+                    if not nomi: continue
+                    mavjud = conn.execute("SELECT id FROM mahsulotlar WHERE LOWER(nomi)=LOWER(?) AND faol=1", (nomi,)).fetchone()
+                    if mavjud:
+                        xatolar.append(f"{i}-qator: '{nomi}' allaqachon mavjud, o'tkazib yuborildi")
+                        continue
+                    birlik = (row.get('birlik') or row.get('Birlik') or 'dona').strip()
+                    try:
+                        kelish = float((row.get('kelish_narxi') or row.get('Kelish narxi') or '0').replace(' ','').replace(',','.'))
+                        sotish = float((row.get('sotish_narxi') or row.get('Sotish narxi') or '0').replace(' ','').replace(',','.'))
+                        miqdor = float((row.get('miqdor') or row.get('Miqdor') or '0').replace(' ','').replace(',','.'))
+                        min_m  = float((row.get('min_miqdor') or row.get('Min miqdor') or '5').replace(' ','').replace(',','.'))
+                    except: kelish=sotish=miqdor=0; min_m=5
+                    kat_nomi = (row.get('kategoriya') or row.get('Kategoriya') or '').strip()
+                    kat_id = None
+                    if kat_nomi:
+                        k = conn.execute("SELECT id FROM kategoriyalar WHERE LOWER(nomi)=LOWER(?)", (kat_nomi,)).fetchone()
+                        if k: kat_id = k['id']
+                        else:
+                            kat_id = conn.execute("INSERT INTO kategoriyalar (nomi,tavsif) VALUES (?,?)", (kat_nomi,'Import orqali qo\'shildi')).lastrowid
+                    conn.execute("INSERT INTO mahsulotlar (nomi,kategoriya_id,birlik,kelish_narxi,sotish_narxi,miqdor,min_miqdor) VALUES (?,?,?,?,?,?,?)",
+                        (nomi,kat_id,birlik,kelish,sotish,miqdor,min_m))
+                    qoshildi += 1
+                conn.commit()
+                return self.send_json({'muvaffaqiyat':True,'qoshildi':qoshildi,'xatolar':xatolar})
+
+            if path == '/api/import/mijozlar':
+                # CSV: ism,familiya,telefon,manzil
+                csv_text = body.get('csv','')
+                if not csv_text: return self.send_error_json('CSV ma\'lumot yo\'q!')
+                reader = csv.DictReader(io.StringIO(csv_text))
+                qoshildi = 0; xatolar = []
+                for i, row in enumerate(reader, 2):
+                    ism = (row.get('ism') or row.get('Ism') or '').strip()
+                    if not ism: continue
+                    familiya = (row.get('familiya') or row.get('Familiya') or '').strip()
+                    telefon  = (row.get('telefon')  or row.get('Telefon')  or '').strip()
+                    manzil   = (row.get('manzil')   or row.get('Manzil')   or '').strip()
+                    conn.execute("INSERT INTO mijozlar (ism,familiya,telefon,manzil) VALUES (?,?,?,?)", (ism,familiya,telefon,manzil))
+                    qoshildi += 1
+                conn.commit()
+                return self.send_json({'muvaffaqiyat':True,'qoshildi':qoshildi,'xatolar':xatolar})
 
             self.send_error_json('Topilmadi', 404)
         except Exception as e:
@@ -356,6 +458,12 @@ class Handler(BaseHTTPRequestHandler):
             m = re.match(r'^/api/kategoriyalar/(\d+)$', path)
             if m:
                 conn.execute("UPDATE kategoriyalar SET nomi=?,tavsif=? WHERE id=?", (body['nomi'],body.get('tavsif',''),m.group(1)))
+                conn.commit(); return self.send_json({'muvaffaqiyat':True})
+
+            m = re.match(r'^/api/mijozlar/(\d+)$', path)
+            if m:
+                conn.execute("UPDATE mijozlar SET ism=?,familiya=?,telefon=?,manzil=?,izoh=?,qarz=? WHERE id=?",
+                    (body['ism'],body.get('familiya',''),body.get('telefon',''),body.get('manzil',''),body.get('izoh',''),body.get('qarz',0),m.group(1)))
                 conn.commit(); return self.send_json({'muvaffaqiyat':True})
 
             m = re.match(r'^/api/mahsulotlar/(\d+)$', path)
@@ -386,7 +494,16 @@ class Handler(BaseHTTPRequestHandler):
 
             m = re.match(r'^/api/mahsulotlar/(\d+)$', path)
             if m:
+                # Miqdor 0 bo'lmasa o'chirish mumkin emas
+                row = conn.execute("SELECT miqdor,nomi FROM mahsulotlar WHERE id=?", (m.group(1),)).fetchone()
+                if row and row['miqdor'] > 0:
+                    return self.send_error_json(f"'{row['nomi']}' mahsulotini o'chirishdan avval miqdorni 0 ga tushiring! Hozir: {row['miqdor']}")
                 conn.execute("UPDATE mahsulotlar SET faol=0 WHERE id=?", (m.group(1),)); conn.commit()
+                return self.send_json({'muvaffaqiyat':True})
+
+            m = re.match(r'^/api/mijozlar/(\d+)$', path)
+            if m:
+                conn.execute("UPDATE mijozlar SET faol=0 WHERE id=?", (m.group(1),)); conn.commit()
                 return self.send_json({'muvaffaqiyat':True})
 
             m = re.match(r'^/api/sotuvlar/(\d+)$', path)

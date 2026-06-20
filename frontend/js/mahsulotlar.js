@@ -9,7 +9,8 @@ async function mahsulotlarYukla() {
     <div class="card">
       <div class="card-header">
         <div class="filter-bar">
-          <input type="text" id="mahQidiruv" class="search-input" placeholder="🔍 Nomi yoki shtrix kod..." oninput="mahsulotlarFilter()">
+          <input type="text" id="mahQidiruv" class="search-input"
+            placeholder="🔍 Nomi yoki shtrix kod..." oninput="mahsulotlarFilter()">
           <select id="mahKategoriya" class="filter-select" onchange="mahsulotlarFilter()">
             <option value="">Barcha kategoriyalar</option>
           </select>
@@ -18,9 +19,16 @@ async function mahsulotlarYukla() {
             <option value="kam">Kam qolganlar</option>
           </select>
         </div>
-        <div style="display:flex;gap:8px">
-          <button class="btn btn-secondary btn-sm" onclick="kategoriyalarBoshqar()"><i class="fas fa-tags"></i> Kategoriyalar</button>
-          <button class="btn btn-primary" onclick="mahsulotQosh()"><i class="fas fa-plus"></i> Yangi mahsulot</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-secondary btn-sm" onclick="kategoriyalarBoshqar()">
+            <i class="fas fa-tags"></i> Kategoriyalar
+          </button>
+          <button class="btn btn-secondary btn-sm" onclick="mahsulotlarExcelImport()">
+            <i class="fas fa-file-excel"></i> Excel import
+          </button>
+          <button class="btn btn-primary" onclick="mahsulotQosh()">
+            <i class="fas fa-plus"></i> Yangi mahsulot
+          </button>
         </div>
       </div>
       <div class="card-body">
@@ -30,7 +38,9 @@ async function mahsulotlarYukla() {
     </div>`;
 
   try {
-    [mahsulotlarRoyxat, kategoriyalarRoyxat] = await Promise.all([apiGet('/mahsulotlar'), apiGet('/kategoriyalar')]);
+    [mahsulotlarRoyxat, kategoriyalarRoyxat] = await Promise.all([
+      apiGet('/mahsulotlar'), apiGet('/kategoriyalar')
+    ]);
     const sel = document.getElementById('mahKategoriya');
     kategoriyalarRoyxat.forEach(k => sel.innerHTML += `<option value="${k.id}">${k.nomi}</option>`);
     mahsulotlarKorsatish(mahsulotlarRoyxat);
@@ -53,8 +63,7 @@ function mahsulotlarFilter() {
 
 function mahsulotlarKorsatish(royxat) {
   const bosh = (joriySahifa - 1) * SAHIFADAGI_SON;
-  const oxir = bosh + SAHIFADAGI_SON;
-  const sahifadagilar = royxat.slice(bosh, oxir);
+  const sahifadagilar = royxat.slice(bosh, bosh + SAHIFADAGI_SON);
   const jami_sahifa = Math.ceil(royxat.length / SAHIFADAGI_SON);
 
   document.getElementById('mahsulotlarJadval').innerHTML = sahifadagilar.length ? `
@@ -82,8 +91,11 @@ function mahsulotlarKorsatish(royxat) {
                 ? '<span class="badge badge-danger"><i class="fas fa-exclamation-triangle"></i> Kam</span>'
                 : '<span class="badge badge-success"><i class="fas fa-check"></i> Yetarli</span>'}</td>
               <td>
-                <button class="btn btn-warning btn-sm btn-icon" title="Tahrirlash" onclick="mahsulotTahrir(${m.id})"><i class="fas fa-edit"></i></button>
-                <button class="btn btn-danger btn-sm btn-icon" title="O'chirish" onclick="mahsulotOchir(${m.id},'${m.nomi.replace(/'/g,"\\'")}')"><i class="fas fa-trash"></i></button>
+                <button class="btn btn-warning btn-sm btn-icon" title="Tahrirlash"
+                  onclick="mahsulotTahrir(${m.id})"><i class="fas fa-edit"></i></button>
+                <button class="btn btn-danger btn-sm btn-icon" title="O'chirish"
+                  onclick="mahsulotOchir(${m.id},'${m.nomi.replace(/'/g,"\\'")}',${m.miqdor})">
+                  <i class="fas fa-trash"></i></button>
               </td>
             </tr>`).join('')}
         </tbody>
@@ -92,51 +104,59 @@ function mahsulotlarKorsatish(royxat) {
     <div style="padding:10px;color:#64748b;font-size:13px">Jami: ${royxat.length} ta mahsulot</div>` :
     '<div class="empty-state"><i class="fas fa-search"></i><p>Mahsulot topilmadi</p></div>';
 
-  // Pagination
   let pages = '';
   if (jami_sahifa > 1) {
-    if (joriySahifa > 1) pages += `<button class="page-btn" onclick="sahifaOt(${joriySahifa-1},${JSON.stringify(royxat).replace(/"/g,'&quot;')})"><i class="fas fa-chevron-left"></i></button>`;
+    if (joriySahifa > 1) pages += `<button class="page-btn" onclick="sahifaOtIndex(${joriySahifa-1})"><i class="fas fa-chevron-left"></i></button>`;
     for (let i = Math.max(1, joriySahifa-2); i <= Math.min(jami_sahifa, joriySahifa+2); i++) {
       pages += `<button class="page-btn ${i===joriySahifa?'active':''}" onclick="sahifaOtIndex(${i})">${i}</button>`;
     }
-    if (joriySahifa < jami_sahifa) pages += `<button class="page-btn" onclick="sahifaOt(${joriySahifa+1},null)"><i class="fas fa-chevron-right"></i></button>`;
+    if (joriySahifa < jami_sahifa) pages += `<button class="page-btn" onclick="sahifaOtIndex(${joriySahifa+1})"><i class="fas fa-chevron-right"></i></button>`;
   }
   document.getElementById('mahPagination').innerHTML = pages;
   window._mahsulotlarFiltrlangan = royxat;
 }
 
-function sahifaOtIndex(n) { joriySahifa = n; mahsulotlarKorsatish(window._mahsulotlarFiltrlangan || mahsulotlarRoyxat); }
+function sahifaOtIndex(n) {
+  joriySahifa = n;
+  mahsulotlarKorsatish(window._mahsulotlarFiltrlangan || mahsulotlarRoyxat);
+}
 
+// ===== QO'SHISH / TAHRIRLASH =====
 function mahsulotQosh() {
-  const kontent = mahsulotFormKontent();
-  modalOch('Yangi mahsulot qo\'shish', kontent);
+  modalOch('Yangi mahsulot qo\'shish', mahsulotFormKontent());
 }
 
 async function mahsulotTahrir(id) {
   try {
     const m = await apiGet('/mahsulotlar/' + id);
-    const kontent = mahsulotFormKontent(m);
-    modalOch('Mahsulotni tahrirlash', kontent);
+    modalOch('Mahsulotni tahrirlash', mahsulotFormKontent(m));
   } catch (e) { toast(e.message, 'error'); }
 }
 
 function mahsulotFormKontent(m = null) {
-  const katOptions = kategoriyalarRoyxat.map(k => `<option value="${k.id}" ${m && m.kategoriya_id == k.id ? 'selected' : ''}>${k.nomi}</option>`).join('');
+  const katOptions = kategoriyalarRoyxat.map(k =>
+    `<option value="${k.id}" ${m && m.kategoriya_id == k.id ? 'selected' : ''}>${k.nomi}</option>`
+  ).join('');
   const birliklar = ['dona', 'kg', 'm', 'm2', 'm3', 'litr', 'qop', 'paket', 'rulon'];
   return `
     <form onsubmit="mahsulotSaqlash(event,${m ? m.id : 'null'})">
       <div class="form-group">
         <label>Mahsulot nomi *</label>
-        <input type="text" name="nomi" required value="${m ? m.nomi : ''}" placeholder="Masalan: Portland tsement M400">
+        <input type="text" name="nomi" required value="${m ? m.nomi : ''}"
+          placeholder="Masalan: Portland tsement M400">
       </div>
       <div class="form-row">
         <div class="form-group">
           <label>Kategoriya</label>
-          <select name="kategoriya_id"><option value="">— Tanlang —</option>${katOptions}</select>
+          <select name="kategoriya_id">
+            <option value="">— Tanlang —</option>${katOptions}
+          </select>
         </div>
         <div class="form-group">
           <label>Birlik *</label>
-          <select name="birlik">${birliklar.map(b => `<option ${m && m.birlik===b?'selected':''}>${b}</option>`).join('')}</select>
+          <select name="birlik">
+            ${birliklar.map(b => `<option ${m && m.birlik===b ? 'selected' : ''}>${b}</option>`).join('')}
+          </select>
         </div>
       </div>
       <div class="form-row">
@@ -178,7 +198,7 @@ async function mahsulotSaqlash(e, id) {
   e.preventDefault();
   const form = e.target;
   const data = {
-    nomi: form.nomi.value,
+    nomi: form.nomi.value.trim(),
     kategoriya_id: form.kategoriya_id.value || null,
     birlik: form.birlik.value,
     kelish_narxi: parseFloat(form.kelish_narxi.value) || 0,
@@ -196,13 +216,136 @@ async function mahsulotSaqlash(e, id) {
   } catch (e) { toast(e.message, 'error'); }
 }
 
-function mahsulotOchir(id, nomi) {
+// ===== O'CHIRISH — miqdor 0 bo'lishi shart =====
+function mahsulotOchir(id, nomi, miqdor) {
+  if (miqdor > 0) {
+    modalOch('⚠️ O\'chirib bo\'lmaydi', `
+      <div style="text-align:center;padding:10px">
+        <i class="fas fa-exclamation-triangle fa-3x" style="color:#f59e0b;margin-bottom:12px"></i>
+        <p style="font-size:15px;margin-bottom:8px">
+          <b>"${nomi}"</b> mahsulotini o'chirib bo'lmaydi!
+        </p>
+        <p style="color:#64748b;font-size:14px">
+          Hozirgi miqdor: <b style="color:#ef4444">${miqdor}</b><br>
+          O'chirishdan avval miqdorni <b>0</b> ga tushiring.
+        </p>
+        <div style="margin-top:16px">
+          <button class="btn btn-secondary" onclick="modalYop()">Yopish</button>
+          <button class="btn btn-warning" style="margin-left:8px"
+            onclick="modalYop();mahsulotTahrir(${id})">
+            <i class="fas fa-edit"></i> Miqdorni o'zgartirish
+          </button>
+        </div>
+      </div>`);
+    return;
+  }
   tasdiqlash(`"${nomi}" mahsulotini o'chirasizmi?`, async () => {
-    try { await apiDelete('/mahsulotlar/' + id); toast('Mahsulot o\'chirildi!'); mahsulotlarYukla(); }
-    catch (e) { toast(e.message, 'error'); }
+    try {
+      await apiDelete('/mahsulotlar/' + id);
+      toast('Mahsulot o\'chirildi!');
+      mahsulotlarYukla();
+    } catch (e) { toast(e.message, 'error'); }
   });
 }
 
+// ===== EXCEL IMPORT (SHABLON BILAN) =====
+function mahsulotlarExcelImport() {
+  const kontent = `
+    <div>
+      <!-- Shablon yuklab olish -->
+      <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:12px;margin-bottom:14px">
+        <div style="font-weight:600;margin-bottom:6px;color:#1d4ed8">
+          <i class="fas fa-download"></i> 1-qadam: Shablonni yuklab oling
+        </div>
+        <p style="font-size:13px;color:#3b82f6;margin-bottom:8px">
+          Shablon faylni yuklab oling, ma'lumotlarni to'ldiring va qayta yuklang.
+        </p>
+        <button class="btn btn-primary btn-sm" onclick="mahsulotShablonYukla()">
+          <i class="fas fa-file-csv"></i> CSV Shablon yuklab olish
+        </button>
+      </div>
+
+      <!-- Fayl yuklash -->
+      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px;margin-bottom:14px">
+        <div style="font-weight:600;margin-bottom:6px;color:#15803d">
+          <i class="fas fa-upload"></i> 2-qadam: To'ldirilgan faylni yuklang
+        </div>
+        <input type="file" id="mahCSVFayl" accept=".csv,.txt"
+          style="width:100%;padding:8px;border:2px dashed #e2e8f0;border-radius:8px;background:white"
+          onchange="csvFaylOqi(this,'mahCSVMatn')">
+      </div>
+
+      <!-- Preview -->
+      <div class="form-group">
+        <label style="font-weight:600">CSV mazmuni (tekshirish yoki qo'lda kiritish):</label>
+        <textarea id="mahCSVMatn" rows="7"
+          style="width:100%;font-family:monospace;font-size:12px;border:1px solid #e2e8f0;border-radius:8px;padding:8px"
+          placeholder="nomi,birlik,kelish_narxi,sotish_narxi,miqdor,min_miqdor,kategoriya"></textarea>
+      </div>
+
+      <div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;padding:10px;font-size:12px;color:#92400e;margin-bottom:10px">
+        <b>⚠ Eslatma:</b> Bir xil nomli mahsulotlar o'tkazib yuboriladi (duplikat himoyasi).
+      </div>
+
+      <div class="modal-footer" style="padding:0">
+        <button class="btn btn-secondary" onclick="modalYop()">Bekor</button>
+        <button class="btn btn-success" onclick="mahsulotCSVYukla()">
+          <i class="fas fa-upload"></i> Import qilish
+        </button>
+      </div>
+    </div>`;
+  modalOch('Mahsulotlarni Excel/CSV orqali import', kontent);
+}
+
+function mahsulotShablonYukla() {
+  // Kategoriya nomlarini olish
+  const katlar = kategoriyalarRoyxat.map(k => k.nomi).join(' / ');
+  const sarlavha = 'nomi,birlik,kelish_narxi,sotish_narxi,miqdor,min_miqdor,kategoriya';
+  const namunaQatorlar = [
+    `Portland tsement M400,qop,85000,95000,100,10,Tsement va qorishmalar`,
+    `Armatura 12mm,m,18000,22000,500,20,Temir va metall`,
+    `G'isht qizil,dona,1200,1500,1000,50,G'isht va bloklar`,
+  ];
+  const csvMatn = sarlavha + '\n' + namunaQatorlar.join('\n');
+  const blob = new Blob(['\uFEFF' + csvMatn], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'mahsulotlar_shablon.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('Shablon yuklandi! Excel yoki Notepad da oching.', 'success');
+}
+
+async function mahsulotCSVYukla() {
+  const csv = document.getElementById('mahCSVMatn').value.trim();
+  if (!csv) { toast('CSV matn bo\'sh!', 'warning'); return; }
+  try {
+    const r = await apiPost('/import/mahsulotlar', { csv });
+    modalYop();
+    toast(`✅ ${r.qoshildi} ta mahsulot qo'shildi!`, 'success');
+    if (r.xatolar && r.xatolar.length) {
+      setTimeout(() => toast(`⚠ ${r.xatolar.length} ta o'tkazib yuborildi: ${r.xatolar[0]}`, 'warning'), 3500);
+    }
+    mahsulotlarYukla();
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+// CSV faylni o'qish yordamchi funksiya
+function csvFaylOqi(input, targetId) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    let text = e.target.result;
+    // BOM ni olib tashlash
+    if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+    document.getElementById(targetId).value = text;
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+// ===== KATEGORIYALAR =====
 function kategoriyalarBoshqar() {
   kategoriyalarYuklaModal();
 }
@@ -212,19 +355,25 @@ async function kategoriyalarYuklaModal() {
   const kontent = `
     <div style="margin-bottom:16px">
       <form onsubmit="kategoriyaQosh(event)" style="display:flex;gap:8px">
-        <input type="text" id="yangiKat" placeholder="Kategoriya nomi" class="search-input" required style="flex:1">
-        <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> Qo'sh</button>
+        <input type="text" id="yangiKat" placeholder="Kategoriya nomi"
+          class="search-input" required style="flex:1">
+        <button type="submit" class="btn btn-primary btn-sm">
+          <i class="fas fa-plus"></i> Qo'sh
+        </button>
       </form>
     </div>
     <div class="table-wrapper">
       <table>
         <thead><tr><th>Nomi</th><th>Amallar</th></tr></thead>
-        <tbody id="katJadval">
+        <tbody>
           ${katlar.map(k => `
             <tr>
               <td>${k.nomi}</td>
               <td>
-                <button class="btn btn-danger btn-sm btn-icon" onclick="kategoriyaOchir(${k.id},'${k.nomi.replace(/'/g,"\\'")}')"><i class="fas fa-trash"></i></button>
+                <button class="btn btn-danger btn-sm btn-icon"
+                  onclick="kategoriyaOchir(${k.id},'${k.nomi.replace(/'/g,"\\'")}')">
+                  <i class="fas fa-trash"></i>
+                </button>
               </td>
             </tr>`).join('')}
         </tbody>
@@ -245,7 +394,10 @@ async function kategoriyaQosh(e) {
 
 function kategoriyaOchir(id, nomi) {
   tasdiqlash(`"${nomi}" kategoriyasini o'chirasizmi?`, async () => {
-    try { await apiDelete('/kategoriyalar/' + id); toast('Kategoriya o\'chirildi!'); kategoriyalarYuklaModal(); }
-    catch (e) { toast(e.message, 'error'); }
+    try {
+      await apiDelete('/kategoriyalar/' + id);
+      toast('Kategoriya o\'chirildi!');
+      kategoriyalarYuklaModal();
+    } catch (e) { toast(e.message, 'error'); }
   });
 }

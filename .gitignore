@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+dokoni.db
+dokoni.db-shm
+dokoni.db-wal
