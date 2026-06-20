@@ -4,8 +4,13 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 from datetime import datetime
 
-DB_PATH = os.environ.get('DB_PATH', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'dokoni.db'))
+# ===== DB YO'LI =====
+# Railway Volume ishlatilsa /data papkasida, aks holda local
+DATA_DIR = os.environ.get('RAILWAY_VOLUME_MOUNT_PATH', os.path.dirname(os.path.abspath(__file__)))
+DB_PATH  = os.path.join(DATA_DIR, 'dokoni.db')
 FRONTEND = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'frontend')
+
+print(f"📦 DB joyi: {DB_PATH}")
 
 def get_db():
     conn = sqlite3.connect(DB_PATH)
@@ -151,12 +156,18 @@ def init_db():
         for n, t in kats:
             c.execute("INSERT OR IGNORE INTO kategoriyalar (nomi,tavsif) VALUES (?,?)", (n,t))
     conn.commit()
-    # Mavjud bazaga rasm ustunini qo'shish (migration)
-    try:
-        conn.execute("ALTER TABLE mahsulotlar ADD COLUMN rasm TEXT")
-        conn.commit()
+    # ===== MIGRATION TIZIMI =====
+    # Har yangilikda bu yerga qo'shiladi, eski bazaga zarar yetmaydi
+
+    # v1: rasm ustuni
+    try: conn.execute("ALTER TABLE mahsulotlar ADD COLUMN rasm TEXT"); conn.commit()
     except: pass
-    # mahsulot_logi jadvalini yaratish (migration)
+
+    # v2: mijoz_id sotuvlarda
+    try: conn.execute("ALTER TABLE sotuvlar ADD COLUMN mijoz_id INTEGER"); conn.commit()
+    except: pass
+
+    # v3: mahsulot_logi jadvali
     try:
         conn.execute("""CREATE TABLE IF NOT EXISTS mahsulot_logi (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -168,23 +179,40 @@ def init_db():
         )""")
         conn.commit()
     except: pass
-    # kassa_harakatlari jadvalini yaratish (migration)
+
+    # v4: kassa_harakatlari jadvali
     try:
         conn.execute("""CREATE TABLE IF NOT EXISTS kassa_harakatlari (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            tur TEXT NOT NULL,
-            nomi TEXT NOT NULL,
-            summa REAL NOT NULL,
-            tolov_turi TEXT DEFAULT 'naqd',
-            kategoriya TEXT,
-            foydalanuvchi_id INTEGER,
-            foydalanuvchi_ismi TEXT,
-            izoh TEXT,
+            tur TEXT NOT NULL, nomi TEXT NOT NULL,
+            summa REAL NOT NULL, tolov_turi TEXT DEFAULT 'naqd',
+            kategoriya TEXT, foydalanuvchi_id INTEGER,
+            foydalanuvchi_ismi TEXT, izoh TEXT,
             sana TEXT DEFAULT (datetime('now','localtime'))
         )""")
         conn.commit()
     except: pass
+
+    # v5: qaytarishlar jadvali
+    try:
+        conn.execute("""CREATE TABLE IF NOT EXISTS qaytarishlar (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            sotuv_id INTEGER, chek_raqam TEXT,
+            kassir_id INTEGER NOT NULL, mijoz_id INTEGER,
+            mijoz_ismi TEXT, sabab TEXT,
+            jami_summa REAL DEFAULT 0,
+            sana TEXT DEFAULT (datetime('now','localtime'))
+        )""")
+        conn.execute("""CREATE TABLE IF NOT EXISTS qaytarish_tafsilotlari (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            qaytarish_id INTEGER NOT NULL, mahsulot_id INTEGER NOT NULL,
+            miqdor REAL NOT NULL, narxi REAL NOT NULL, jami REAL NOT NULL
+        )""")
+        conn.commit()
+    except: pass
+
     conn.close()
+    print("✅ Database tayyor!")
 
 
 def rows_to_list(rows):
