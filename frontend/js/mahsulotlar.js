@@ -305,7 +305,8 @@ async function mahsulotSaqlash(e, id) {
     min_miqdor: parseFloat(form.min_miqdor.value) || 5,
     shtrix_kod: form.shtrix_kod.value || null,
     tavsif: form.tavsif.value,
-    rasm: document.getElementById('rasmInput')?.value || null
+    rasm: document.getElementById('rasmInput')?.value || null,
+    foydalanuvchi_id: joriyFoydalanuvchi?.id || null
   };
   try {
     if (id) { await apiPut('/mahsulotlar/' + id, data); toast('Mahsulot yangilandi!'); }

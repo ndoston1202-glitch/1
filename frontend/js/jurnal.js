@@ -20,6 +20,7 @@ async function jurnalYukla() {
             <option value="qaytarish">↩️ Qaytarishlar</option>
             <option value="kirim">📦 Ombor kirim</option>
             <option value="xarajat">💸 Xarajatlar</option>
+            <option value="mahsulot">📦 Mahsulot o'zgarishlari</option>
           </select>
           <input type="text" id="jQidiruv" class="search-input"
             placeholder="🔍 Qidirish..." oninput="jurnalFilter()" style="width:180px">
@@ -47,6 +48,10 @@ async function jurnalYukla() {
         <div class="stat-card" style="cursor:pointer" onclick="jurnalTurFilter('barchasi')">
           <div class="stat-icon purple"><i class="fas fa-list-alt"></i></div>
           <div class="stat-info"><h3 id="jJamiSon">—</h3><p>Jami operatsiya</p></div>
+        </div>
+        <div id="jStat5" class="stat-card" style="cursor:pointer" onclick="jurnalTurFilter('mahsulot')">
+          <div class="stat-icon" style="background:linear-gradient(135deg,#8b5cf6,#c4b5fd)"><i class="fas fa-box"></i></div>
+          <div class="stat-info"><h3 id="jMahsulotSon">—</h3><p>Mahsulot o'zgarish</p></div>
         </div>
       </div>
 
@@ -106,20 +111,25 @@ function jurnalStatKorsatish(data) {
   const xarajatlar = data.filter(o => o.tur === 'xarajat');
 
   const el = id => document.getElementById(id);
-  if (el('jSotuvSon'))   el('jSotuvSon').textContent   = `${sotuvlar.length} ta`;
-  if (el('jQaytSon'))    el('jQaytSon').textContent    = `${qaytarish.length} ta`;
-  if (el('jKirimSon'))   el('jKirimSon').textContent   = `${kirimlar.length} ta`;
-  if (el('jXarajatSon')) el('jXarajatSon').textContent = `${xarajatlar.length} ta`;
-  if (el('jJamiSon'))    el('jJamiSon').textContent    = `${data.length} ta`;
+  if (el('jSotuvSon'))    el('jSotuvSon').textContent    = `${sotuvlar.length} ta`;
+  if (el('jQaytSon'))     el('jQaytSon').textContent     = `${qaytarish.length} ta`;
+  if (el('jKirimSon'))    el('jKirimSon').textContent    = `${kirimlar.length} ta`;
+  if (el('jXarajatSon'))  el('jXarajatSon').textContent  = `${xarajatlar.length} ta`;
+  if (el('jJamiSon'))     el('jJamiSon').textContent     = `${data.length} ta`;
+  const mahsulotLogi = data.filter(o => ['qoshildi','tahrirlandi','ochirildi'].includes(o.tur));
+  if (el('jMahsulotSon')) el('jMahsulotSon').textContent = `${mahsulotLogi.length} ta`;
 }
 
 // Tur bo'yicha badge
 function turBadge(tur) {
   const m = {
-    sotuv:    { bg: '#dcfce7', color: '#166534', icon: 'fa-shopping-cart',  matn: 'Sotuv'    },
-    qaytarish:{ bg: '#fee2e2', color: '#991b1b', icon: 'fa-undo',           matn: 'Qaytarish'},
-    kirim:    { bg: '#dbeafe', color: '#1e40af', icon: 'fa-boxes',          matn: 'Kirim'    },
-    xarajat:  { bg: '#fef3c7', color: '#92400e', icon: 'fa-money-bill',     matn: 'Xarajat'  },
+    sotuv:      { bg: '#dcfce7', color: '#166534', icon: 'fa-shopping-cart',  matn: 'Sotuv'         },
+    qaytarish:  { bg: '#fee2e2', color: '#991b1b', icon: 'fa-undo',           matn: 'Qaytarish'     },
+    kirim:      { bg: '#dbeafe', color: '#1e40af', icon: 'fa-boxes',          matn: 'Kirim'         },
+    xarajat:    { bg: '#fef3c7', color: '#92400e', icon: 'fa-money-bill',     matn: 'Xarajat'       },
+    qoshildi:   { bg: '#f0fdf4', color: '#166534', icon: 'fa-plus-circle',    matn: 'Mahsulot ++'   },
+    tahrirlandi:{ bg: '#eff6ff', color: '#1e40af', icon: 'fa-edit',           matn: 'Tahrirlandi'   },
+    ochirildi:  { bg: '#fdf2f8', color: '#86198f', icon: 'fa-trash',          matn: 'O\'chirildi'   },
   };
   const t = m[tur] || { bg:'#f1f5f9', color:'#475569', icon:'fa-circle', matn: tur };
   return `<span style="display:inline-flex;align-items:center;gap:5px;padding:3px 10px;
@@ -197,15 +207,25 @@ function jurnalJadvalKorsatish(data) {
               </td>
               <td style="font-size:13px">${o.xodim || '-'}</td>
               <td style="font-size:13px;color:#475569;max-width:160px">
-                ${o.tur === 'sotuv' ? (o.mijoz_ismi || '<span style="color:#94a3b8">Mijozsiz</span>') : ''}
+                ${o.tur === 'sotuv' ? `
+                  <div>${o.mijoz_ismi || '<span style="color:#94a3b8">Mijozsiz</span>'}</div>
+                  <div style="font-size:11px;color:#64748b">
+                    <i class="fas fa-box" style="color:#10b981"></i> ${o.mahsulotlar_soni || 0} ta mahsulot
+                  </div>` : ''}
                 ${o.tur === 'qaytarish' ? `<span style="color:#ef4444">${o.sabab || o.mijoz_ismi || '-'}</span>` : ''}
                 ${o.tur === 'kirim' ? `📦 ${o.mahsulot_nomi || ''} ${o.miqdor||''} ${o.birlik||''}` : ''}
                 ${o.tur === 'xarajat' ? `💸 ${o.mahsulot_nomi || ''} <span class="badge badge-secondary" style="font-size:11px">${o.sabab||''}</span>` : ''}
+                ${['qoshildi','tahrirlandi','ochirildi'].includes(o.tur) ? `
+                  <div style="font-weight:600">${o.mahsulot_nomi||''}</div>
+                  <div style="font-size:11px;color:#64748b">${o.izoh||o.sabab||''}</div>` : ''}
               </td>
               <td>
-                <span style="${summaCss(o.tur)}">
-                  ${summaBelgi(o.tur)}${formatSum(o.summa)}
-                </span>
+                ${o.tur === 'sotuv' ? `<span style="${summaCss(o.tur)}">+${formatSum(o.summa)}</span>` : ''}
+                ${o.tur === 'qaytarish' ? `<span style="${summaCss(o.tur)}">-${formatSum(o.summa)}</span>` : ''}
+                ${o.tur === 'kirim' ? `<span style="${summaCss(o.tur)}">${formatSum(o.summa)}</span>` : ''}
+                ${o.tur === 'xarajat' ? `<span style="${summaCss(o.tur)}">-${formatSum(o.summa)}</span>` : ''}
+                ${['qoshildi','tahrirlandi','ochirildi'].includes(o.tur) ? `
+                  <span style="color:#8b5cf6;font-size:12px">${formatSum(o.sotish_narxi||o.summa||0)}</span>` : ''}
               </td>
               <td style="font-size:12px;color:#64748b;white-space:nowrap">
                 ${formatSana(o.sana)}
@@ -374,13 +394,71 @@ async function jurnalBatafsil(index) {
             </tr>
           </table>
         </div>`;
+
+    } else if (['qoshildi','tahrirlandi','ochirildi'].includes(o.tur)) {
+      const amalRangi = o.tur==='qoshildi' ? '#10b981' : o.tur==='tahrirlandi' ? '#2563eb' : '#ef4444';
+      const amalIcon  = o.tur==='qoshildi' ? 'fa-plus-circle' : o.tur==='tahrirlandi' ? 'fa-edit' : 'fa-trash';
+      const amalMatn  = o.tur==='qoshildi' ? 'Qo\'shildi' : o.tur==='tahrirlandi' ? 'Tahrirlandi' : 'O\'chirildi';
+      kontent = `
+        <div style="background:#f8fafc;padding:16px;border-radius:8px;
+          border:2px solid ${amalRangi}20;margin-bottom:16px">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+            <div style="width:40px;height:40px;border-radius:50%;background:${amalRangi}20;
+              display:flex;align-items:center;justify-content:center">
+              <i class="fas ${amalIcon}" style="color:${amalRangi};font-size:18px"></i>
+            </div>
+            <div>
+              <div style="font-weight:700;font-size:15px">${amalMatn}</div>
+              <div style="font-size:12px;color:#64748b">${formatSana(o.sana)}</div>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:14px">
+            <div><b>Xodim:</b> ${o.xodim||'Tizim'}</div>
+            <div><b>Raqam:</b> <code style="font-size:12px">${o.raqam}</code></div>
+          </div>
+        </div>
+        <div style="background:white;border:1px solid #e2e8f0;border-radius:8px;padding:16px">
+          <h4 style="margin-bottom:12px;font-size:14px">
+            <i class="fas fa-box"></i> Mahsulot ma'lumotlari
+          </h4>
+          <table style="width:100%;font-size:14px;border-collapse:collapse">
+            <tr style="border-bottom:1px solid #f1f5f9">
+              <td style="color:#64748b;padding:7px 0;width:40%">Nomi:</td>
+              <td><b>${o.mahsulot_nomi||'-'}</b></td>
+            </tr>
+            <tr style="border-bottom:1px solid #f1f5f9">
+              <td style="color:#64748b;padding:7px 0">Birlik:</td>
+              <td>${o.birlik||'-'}</td>
+            </tr>
+            <tr style="border-bottom:1px solid #f1f5f9">
+              <td style="color:#64748b;padding:7px 0">Miqdor:</td>
+              <td><b>${o.miqdor||0} ${o.birlik||''}</b></td>
+            </tr>
+            <tr style="border-bottom:1px solid #f1f5f9">
+              <td style="color:#64748b;padding:7px 0">Kelish narxi:</td>
+              <td>${formatSum(o.kelish_narxi||0)}</td>
+            </tr>
+            <tr style="border-bottom:1px solid #f1f5f9">
+              <td style="color:#64748b;padding:7px 0">Sotish narxi:</td>
+              <td><b style="color:#2563eb">${formatSum(o.sotish_narxi||0)}</b></td>
+            </tr>
+            ${o.izoh||o.sabab ? `
+            <tr>
+              <td style="color:#64748b;padding:7px 0">Izoh:</td>
+              <td style="color:#475569">${o.izoh||o.sabab||''}</td>
+            </tr>` : ''}
+          </table>
+        </div>`;
     }
 
     const sarlavhalar = {
-      sotuv:    `🛒 Sotuv — ${o.raqam}`,
-      qaytarish:`↩️ Qaytarish — ${o.raqam}`,
-      kirim:    `📦 Ombor kirim — ${o.raqam}`,
-      xarajat:  `💸 Xarajat — ${o.raqam}`,
+      sotuv:      `🛒 Sotuv — ${o.raqam}`,
+      qaytarish:  `↩️ Qaytarish — ${o.raqam}`,
+      kirim:      `📦 Ombor kirim — ${o.raqam}`,
+      xarajat:    `💸 Xarajat — ${o.raqam}`,
+      qoshildi:   `✅ Mahsulot qo'shildi`,
+      tahrirlandi:`✏️ Mahsulot tahrirlandi`,
+      ochirildi:  `🗑️ Mahsulot o'chirildi`,
     };
 
     modalOch(sarlavhalar[o.tur] || 'Batafsil', kontent + `

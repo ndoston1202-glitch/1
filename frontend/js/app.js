@@ -49,14 +49,15 @@ function sahifaOch(nomi) {
   if (menuEl) menuEl.classList.add('active');
 
   const nomlar = {
-    dashboard: '📊 Dashboard',
-    kassa: '🛒 Kassa / Sotuv',
-    mahsulotlar: '🏪 Ombor / Mahsulotlar',
-    hisobot: '📈 Hisobotlar',
-    jurnal: '📖 Jurnal',
-    mijozlar: '👥 Mijozlar',
-    xodimlar: '👔 HR / Xodimlar',
-    sozlamalar: '⚙️ Sozlamalar'
+    dashboard:    'Dashboard',
+    kassa:        'Sotuv',
+    kassa_hisobi: 'Kassa hisobi',
+    mahsulotlar:  'Ombor',
+    hisobot:      'Hisobotlar',
+    jurnal:       'Jurnal',
+    mijozlar:     'Mijozlar',
+    xodimlar:     'Xodimlar',
+    sozlamalar:   'Sozlamalar'
   };
   document.getElementById('sahifaNomi').textContent = nomlar[nomi] || nomi;
 
@@ -70,6 +71,7 @@ function sahifaOch(nomi) {
   switch(nomi) {
     case 'dashboard': dashboardYukla(); break;
     case 'kassa': kassaYukla(); break;
+    case 'kassa_hisobi': kassaHisobiYukla(); break;
     case 'mahsulotlar': mahsulotlarYukla('mahsulotlar'); break;
     case 'ombor': mahsulotlarYukla('ombor'); break;
     case 'hisobot': hisobotYukla(); break;

@@ -99,6 +99,21 @@ def init_db():
         FOREIGN KEY (qaytarish_id) REFERENCES qaytarishlar(id),
         FOREIGN KEY (mahsulot_id) REFERENCES mahsulotlar(id)
     );
+    CREATE TABLE IF NOT EXISTS mahsulot_logi (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        amal TEXT NOT NULL,
+        mahsulot_id INTEGER,
+        mahsulot_nomi TEXT NOT NULL,
+        kategoriya TEXT,
+        birlik TEXT,
+        kelish_narxi REAL,
+        sotish_narxi REAL,
+        miqdor REAL,
+        foydalanuvchi_id INTEGER,
+        foydalanuvchi_ismi TEXT,
+        izoh TEXT,
+        sana TEXT DEFAULT (datetime('now','localtime'))
+    );
     """)
     conn.commit()
     admin = c.execute("SELECT id FROM foydalanuvchilar WHERE username='admin'").fetchone()
@@ -127,6 +142,25 @@ def init_db():
     # Mavjud bazaga rasm ustunini qo'shish (migration)
     try:
         conn.execute("ALTER TABLE mahsulotlar ADD COLUMN rasm TEXT")
+        conn.commit()
+    except: pass
+    # mahsulot_logi jadvalini yaratish (migration)
+    try:
+        conn.execute("""CREATE TABLE IF NOT EXISTS mahsulot_logi (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            amal TEXT NOT NULL,
+            mahsulot_id INTEGER,
+            mahsulot_nomi TEXT NOT NULL,
+            kategoriya TEXT,
+            birlik TEXT,
+            kelish_narxi REAL,
+            sotish_narxi REAL,
+            miqdor REAL,
+            foydalanuvchi_id INTEGER,
+            foydalanuvchi_ismi TEXT,
+            izoh TEXT,
+            sana TEXT DEFAULT (datetime('now','localtime'))
+        )""")
         conn.commit()
     except: pass
     conn.close()
@@ -430,6 +464,24 @@ class Handler(BaseHTTPRequestHandler):
                     """, (bosh, tug)).fetchall()
                     operatsiyalar += [dict(r) for r in rows]
 
+                # MAHSULOT LOGLARI
+                if tur in ('barchasi','mahsulot'):
+                    rows = conn.execute("""
+                        SELECT l.id, l.amal as tur,
+                            'MAH'||l.id as raqam,
+                            COALESCE(l.sotish_narxi,0) as summa,
+                            '' as tolov_turi, '' as mijoz_ismi,
+                            l.sana, l.izoh as sabab,
+                            COALESCE(l.foydalanuvchi_ismi,'Tizim') as xodim,
+                            1 as mahsulotlar_soni,
+                            l.mahsulot_nomi, l.miqdor, l.birlik,
+                            l.kelish_narxi, l.sotish_narxi,
+                            l.mahsulot_id
+                        FROM mahsulot_logi l
+                        WHERE date(l.sana)>=? AND date(l.sana)<=?
+                    """, (bosh, tug)).fetchall()
+                    operatsiyalar += [dict(r) for r in rows]
+
                 # Sana bo'yicha tartiblash (yangilari birinchi)
                 operatsiyalar.sort(key=lambda x: x.get('sana',''), reverse=True)
                 return self.send_json(operatsiyalar[:limit])
@@ -490,6 +542,16 @@ class Handler(BaseHTTPRequestHandler):
                     r = conn.execute("INSERT INTO mahsulotlar (nomi,kategoriya_id,shtrix_kod,birlik,kelish_narxi,sotish_narxi,miqdor,min_miqdor,tavsif,rasm) VALUES (?,?,?,?,?,?,?,?,?,?)",
                         (body['nomi'],body.get('kategoriya_id'),body.get('shtrix_kod'),body.get('birlik','dona'),
                          body.get('kelish_narxi',0),body.get('sotish_narxi',0),body.get('miqdor',0),body.get('min_miqdor',5),body.get('tavsif',''),body.get('rasm'))).lastrowid
+                    # LOG: mahsulot qo'shildi
+                    foydalanuvchi_id = body.get('foydalanuvchi_id')
+                    fism = ''
+                    if foydalanuvchi_id:
+                        fu = conn.execute("SELECT ism,familiya FROM foydalanuvchilar WHERE id=?", (foydalanuvchi_id,)).fetchone()
+                        if fu: fism = fu['ism'] + ' ' + fu['familiya']
+                    conn.execute("INSERT INTO mahsulot_logi (amal,mahsulot_id,mahsulot_nomi,birlik,kelish_narxi,sotish_narxi,miqdor,foydalanuvchi_id,foydalanuvchi_ismi,izoh) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                        ('qoshildi', r, body['nomi'], body.get('birlik','dona'),
+                         body.get('kelish_narxi',0), body.get('sotish_narxi',0),
+                         body.get('miqdor',0), foydalanuvchi_id, fism, 'Yangi mahsulot qo\'shildi'))
                     conn.commit(); return self.send_json({'muvaffaqiyat':True,'id':r})
                 except Exception as e: return self.send_error_json(str(e))
 
@@ -638,8 +700,26 @@ class Handler(BaseHTTPRequestHandler):
 
             m = re.match(r'^/api/mahsulotlar/(\d+)$', path)
             if m:
+                eski = conn.execute("SELECT * FROM mahsulotlar WHERE id=?", (m.group(1),)).fetchone()
                 conn.execute("UPDATE mahsulotlar SET nomi=?,kategoriya_id=?,shtrix_kod=?,birlik=?,kelish_narxi=?,sotish_narxi=?,miqdor=?,min_miqdor=?,tavsif=?,rasm=?,yangilangan=datetime('now','localtime') WHERE id=?",
                     (body['nomi'],body.get('kategoriya_id'),body.get('shtrix_kod'),body.get('birlik','dona'),body.get('kelish_narxi',0),body.get('sotish_narxi',0),body.get('miqdor',0),body.get('min_miqdor',5),body.get('tavsif',''),body.get('rasm'),m.group(1)))
+                # LOG: mahsulot tahrirlandi
+                foydalanuvchi_id = body.get('foydalanuvchi_id')
+                fism = ''
+                if foydalanuvchi_id:
+                    fu = conn.execute("SELECT ism,familiya FROM foydalanuvchilar WHERE id=?", (foydalanuvchi_id,)).fetchone()
+                    if fu: fism = fu['ism'] + ' ' + fu['familiya']
+                izoh_parts = []
+                if eski:
+                    if eski['sotish_narxi'] != body.get('sotish_narxi',0):
+                        izoh_parts.append(f"Narx: {eski['sotish_narxi']} → {body.get('sotish_narxi',0)}")
+                    if eski['miqdor'] != body.get('miqdor',0):
+                        izoh_parts.append(f"Miqdor: {eski['miqdor']} → {body.get('miqdor',0)}")
+                conn.execute("INSERT INTO mahsulot_logi (amal,mahsulot_id,mahsulot_nomi,birlik,kelish_narxi,sotish_narxi,miqdor,foydalanuvchi_id,foydalanuvchi_ismi,izoh) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                    ('tahrirlandi', int(m.group(1)), body['nomi'], body.get('birlik','dona'),
+                     body.get('kelish_narxi',0), body.get('sotish_narxi',0),
+                     body.get('miqdor',0), foydalanuvchi_id, fism,
+                     ', '.join(izoh_parts) if izoh_parts else 'Tahrirlandi'))
                 conn.commit(); return self.send_json({'muvaffaqiyat':True})
 
             self.send_error_json('Topilmadi', 404)
@@ -664,10 +744,14 @@ class Handler(BaseHTTPRequestHandler):
 
             m = re.match(r'^/api/mahsulotlar/(\d+)$', path)
             if m:
-                # Miqdor 0 bo'lmasa o'chirish mumkin emas
-                row = conn.execute("SELECT miqdor,nomi FROM mahsulotlar WHERE id=?", (m.group(1),)).fetchone()
+                row = conn.execute("SELECT miqdor,nomi,birlik,sotish_narxi FROM mahsulotlar WHERE id=?", (m.group(1),)).fetchone()
                 if row and row['miqdor'] > 0:
                     return self.send_error_json(f"'{row['nomi']}' mahsulotini o'chirishdan avval miqdorni 0 ga tushiring! Hozir: {row['miqdor']}")
+                # LOG: mahsulot o'chirildi
+                if row:
+                    conn.execute("INSERT INTO mahsulot_logi (amal,mahsulot_id,mahsulot_nomi,birlik,sotish_narxi,miqdor,izoh) VALUES (?,?,?,?,?,?,?)",
+                        ('ochirildi', int(m.group(1)), row['nomi'], row['birlik'],
+                         row['sotish_narxi'], row['miqdor'], "Mahsulot o'chirildi"))
                 conn.execute("UPDATE mahsulotlar SET faol=0 WHERE id=?", (m.group(1),)); conn.commit()
                 return self.send_json({'muvaffaqiyat':True})
 
