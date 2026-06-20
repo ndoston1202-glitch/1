@@ -194,35 +194,40 @@ async function mijozSotuvlari(id, nomi) {
       <div style="margin-bottom:12px;display:flex;gap:12px;flex-wrap:wrap">
         <div class="stat-card" style="flex:1;min-width:120px">
           <div class="stat-icon blue"><i class="fas fa-shopping-cart"></i></div>
-          <div class="stat-info">
-            <h3>${sotuvlar.length}</h3><p>Jami sotuvlar</p>
-          </div>
+          <div class="stat-info"><h3>${sotuvlar.length}</h3><p>Jami sotuvlar</p></div>
         </div>
         <div class="stat-card" style="flex:1;min-width:120px">
           <div class="stat-icon green"><i class="fas fa-coins"></i></div>
-          <div class="stat-info">
-            <h3>${formatSum(sotuvlar.reduce((s, x) => s + x.jami_summa, 0))}</h3><p>Jami summa</p>
-          </div>
+          <div class="stat-info"><h3>${formatSum(sotuvlar.reduce((s,x)=>s+x.jami_summa,0))}</h3><p>Jami summa</p></div>
         </div>
         <div class="stat-card" style="flex:1;min-width:120px">
           <div class="stat-icon red"><i class="fas fa-credit-card"></i></div>
-          <div class="stat-info">
-            <h3>${formatSum(data.qarz)}</h3><p>Qarz</p>
-          </div>
+          <div class="stat-info"><h3>${formatSum(data.qarz)}</h3><p>Qarz</p></div>
         </div>
       </div>
       ${sotuvlar.length ? `
         <div class="table-wrapper">
           <table>
-            <thead><tr><th>Chek</th><th>Summa</th><th>To'lov</th><th>Sana</th></tr></thead>
+            <thead>
+              <tr><th>Chek</th><th>Summa</th><th>To'lov</th><th>Sana</th></tr>
+            </thead>
             <tbody>
               ${sotuvlar.map(s => `
                 <tr>
-                  <td><span class="badge badge-info">${s.chek_raqam}</span></td>
+                  <td>
+                    <span class="badge badge-info"
+                      style="cursor:pointer;text-decoration:underline"
+                      onclick="mijozChekTafsilot(${s.id},'${s.chek_raqam}')"
+                      title="Tafsilotni ko'rish">
+                      ${s.chek_raqam}
+                    </span>
+                  </td>
                   <td><b>${formatSum(s.jami_summa)}</b></td>
-                  <td><span class="badge ${s.tolov_turi === 'naqd' ? 'badge-success' : s.tolov_turi === 'karta' ? 'badge-info' : 'badge-danger'}">
-                    ${s.tolov_turi === 'naqd' ? '💵 Naqd' : s.tolov_turi === 'karta' ? '💳 Karta' : '📋 Qarz'}
-                  </span></td>
+                  <td>
+                    <span class="badge ${s.tolov_turi==='naqd'?'badge-success':s.tolov_turi==='karta'?'badge-info':'badge-danger'}">
+                      ${s.tolov_turi==='naqd'?'💵 Naqd':s.tolov_turi==='karta'?'💳 Karta':'📋 Qarz'}
+                    </span>
+                  </td>
                   <td style="font-size:12px;color:#64748b">${formatSana(s.sana)}</td>
                 </tr>`).join('')}
             </tbody>
@@ -230,7 +235,74 @@ async function mijozSotuvlari(id, nomi) {
         </div>` :
         '<div class="empty-state"><i class="fas fa-receipt"></i><p>Bu mijozda sotuv yo\'q</p></div>'}`;
     modalOch(`${nomi} — Sotuv tarixi`, kontent);
-  } catch (e) { toast(e.message, 'error'); }
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+// Chek raqamiga bosganida mahsulotlar ro'yxati
+async function mijozChekTafsilot(sotuv_id, chek_raqam) {
+  try {
+    const s = await apiGet('/sotuvlar/' + sotuv_id);
+    const tolovBadge = {
+      naqd:  '<span class="badge badge-success">💵 Naqd</span>',
+      karta: '<span class="badge badge-info">💳 Karta</span>',
+      qarz:  '<span class="badge badge-danger">📋 Qarz</span>',
+    };
+    modalOch(`🧾 ${chek_raqam}`, `
+      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;
+        padding:12px;margin-bottom:14px;font-size:13px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+          <div><span style="color:#64748b">Kassir:</span> <b>${s.kassir_ismi}</b></div>
+          <div><span style="color:#64748b">Sana:</span> <b>${formatSana(s.sana)}</b></div>
+          <div><span style="color:#64748b">To'lov:</span> ${tolovBadge[s.tolov_turi]||s.tolov_turi}</div>
+          ${s.chegirma>0?`<div><span style="color:#64748b">Chegirma:</span> <b style="color:#ef4444">-${formatSum(s.chegirma)}</b></div>`:'<div></div>'}
+        </div>
+      </div>
+
+      <div style="font-weight:600;font-size:13px;color:#475569;margin-bottom:8px">
+        <i class="fas fa-boxes"></i> Sotilgan mahsulotlar (${s.tafsilotlar.length} ta)
+      </div>
+
+      <div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;margin-bottom:12px">
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <thead>
+            <tr style="background:#f8fafc;border-bottom:1px solid #e2e8f0">
+              <th style="padding:8px 12px;text-align:left;color:#64748b">#</th>
+              <th style="padding:8px 12px;text-align:left;color:#64748b">Mahsulot</th>
+              <th style="padding:8px 12px;text-align:right;color:#64748b">Miqdor</th>
+              <th style="padding:8px 12px;text-align:right;color:#64748b">Narxi</th>
+              <th style="padding:8px 12px;text-align:right;color:#64748b">Jami</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${s.tafsilotlar.map((t,i)=>`
+              <tr style="border-top:1px solid #f1f5f9">
+                <td style="padding:8px 12px;color:#94a3b8">${i+1}</td>
+                <td style="padding:8px 12px;font-weight:600">${t.mahsulot_nomi}</td>
+                <td style="padding:8px 12px;text-align:right">${t.miqdor} ${t.birlik}</td>
+                <td style="padding:8px 12px;text-align:right">${formatSum(t.narxi)}</td>
+                <td style="padding:8px 12px;text-align:right;font-weight:700;color:#10b981">
+                  ${formatSum(t.jami)}
+                </td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+
+      <div style="display:flex;justify-content:space-between;font-size:17px;font-weight:700;
+        padding:8px 0;border-top:2px solid #e2e8f0">
+        <span>JAMI:</span>
+        <span style="color:#10b981">+${formatSum(s.jami_summa)}</span>
+      </div>
+
+      <div class="modal-footer" style="padding:0;margin-top:12px">
+        <button class="btn btn-secondary" onclick="modalYop()">
+          <i class="fas fa-times"></i> Yopish
+        </button>
+        <button class="btn btn-primary" onclick="window.print()">
+          <i class="fas fa-print"></i> Chop etish
+        </button>
+      </div>`);
+  } catch(e) { toast(e.message, 'error'); }
 }
 
 // ===== EXCEL (CSV) IMPORT — MIJOZLAR =====

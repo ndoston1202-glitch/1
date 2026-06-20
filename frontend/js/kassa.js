@@ -141,7 +141,7 @@ async function kassaYukla() {
           document.getElementById('chegirmaInput').value = xotira.chegirma || '';
         if (document.getElementById('tolovTuri') && xotira.tolov_turi)
           document.getElementById('tolovTuri').value = xotira.tolov_turi;
-        if (tanlandan_mijoz) mijozBlokniyaJila();
+        if (tanlangan_mijoz) mijozBlokniyaJila();
         chekHisoba();
       }, 50);
       toast('💾 Oxirgi chek qayta yuklandi', 'success');
