@@ -11,32 +11,30 @@ async function kassaHisobiYukla() {
       <div class="stats-grid" style="margin-bottom:20px">
         <div class="stat-card" id="naqdKarta">
           <div class="stat-icon green"><i class="fas fa-money-bill-wave"></i></div>
-          <div class="stat-info">
-            <h3 id="naqdBalans">—</h3>
-            <p>💵 Naqd pul</p>
-          </div>
+          <div class="stat-info"><h3 id="naqdBalans">—</h3><p>💵 Naqd pul</p></div>
         </div>
         <div class="stat-card" id="kartaKarta">
           <div class="stat-icon blue"><i class="fas fa-credit-card"></i></div>
-          <div class="stat-info">
-            <h3 id="kartaBalans">—</h3>
-            <p>💳 Plastik karta</p>
-          </div>
+          <div class="stat-info"><h3 id="kartaBalans">—</h3><p>💳 Plastik karta</p></div>
         </div>
         <div class="stat-card" id="qarzKarta">
           <div class="stat-icon red"><i class="fas fa-hand-holding-usd"></i></div>
-          <div class="stat-info">
-            <h3 id="qarzBalans">—</h3>
-            <p>📋 Jami qarzlar</p>
-          </div>
+          <div class="stat-info"><h3 id="qarzBalans">—</h3><p>📋 Jami qarzlar</p></div>
         </div>
         <div class="stat-card">
           <div class="stat-icon purple"><i class="fas fa-wallet"></i></div>
-          <div class="stat-info">
-            <h3 id="umumiyBalans">—</h3>
-            <p>💰 Umumiy balans</p>
-          </div>
+          <div class="stat-info"><h3 id="umumiyBalans">—</h3><p>💰 Umumiy balans</p></div>
         </div>
+      </div>
+
+      <!-- KIRIM / CHIQIM TUGMALARI -->
+      <div style="display:flex;gap:10px;margin-bottom:16px">
+        <button class="btn btn-success" onclick="kirimQosh()" style="flex:1;padding:12px;font-size:14px">
+          <i class="fas fa-plus-circle"></i> Kassaga kirim
+        </button>
+        <button class="btn btn-danger" onclick="chiqimQosh()" style="flex:1;padding:12px;font-size:14px">
+          <i class="fas fa-minus-circle"></i> Kassadan chiqim
+        </button>
       </div>
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
@@ -82,33 +80,39 @@ async function kassaHisobiYukla() {
 // ===== BALANS HISOBLASH =====
 async function kassaBalansYukla() {
   try {
-    const [sotuvlar, xarajatlar, qaytarishlar] = await Promise.all([
+    const [sotuvlar, qaytarishlar, kassa_h] = await Promise.all([
       apiGet('/sotuvlar'),
-      apiGet('/xarajatlar'),
-      apiGet('/qaytarishlar')
+      apiGet('/qaytarishlar'),
+      apiGet('/kassa_harakatlari')
     ]);
 
-    // Naqd: naqd sotuvlar - xarajatlar - naqd qaytarishlar
+    // Sotuvlardan kirim
     const naqdKirim  = sotuvlar.filter(s => s.tolov_turi === 'naqd').reduce((s,x) => s+x.jami_summa, 0);
     const kartaKirim = sotuvlar.filter(s => s.tolov_turi === 'karta').reduce((s,x) => s+x.jami_summa, 0);
     const qarzKirim  = sotuvlar.filter(s => s.tolov_turi === 'qarz').reduce((s,x) => s+x.jami_summa, 0);
-    const xarajatJami = xarajatlar.reduce((s,x) => s+x.summa, 0);
+
+    // Qaytarishlar chiqim
     const qaytarishJami = qaytarishlar.reduce((s,x) => s+x.jami_summa, 0);
 
-    const naqdBalans  = naqdKirim  - xarajatJami - qaytarishJami;
-    const kartaBalans = kartaKirim;
-    const qarzJami    = qarzKirim;
+    // Qo'lda kiritilgan kassa harakatlari
+    const qKirim  = kassa_h.filter(h => h.tur === 'kirim'  && h.tolov_turi === 'naqd').reduce((s,x) => s+x.summa, 0);
+    const qChiqim = kassa_h.filter(h => h.tur === 'chiqim' && h.tolov_turi === 'naqd').reduce((s,x) => s+x.summa, 0);
+    const kKirim  = kassa_h.filter(h => h.tur === 'kirim'  && h.tolov_turi === 'karta').reduce((s,x) => s+x.summa, 0);
+    const kChiqim = kassa_h.filter(h => h.tur === 'chiqim' && h.tolov_turi === 'karta').reduce((s,x) => s+x.summa, 0);
+
+    const naqdBalans  = naqdKirim  - qaytarishJami + qKirim  - qChiqim;
+    const kartaBalans = kartaKirim                 + kKirim  - kChiqim;
     const umumiy      = naqdBalans + kartaBalans;
 
-    const el = id => document.getElementById(id);
-    if (el('naqdBalans'))    el('naqdBalans').textContent    = formatSum(Math.max(0, naqdBalans));
-    if (el('kartaBalans'))   el('kartaBalans').textContent   = formatSum(kartaBalans);
-    if (el('qarzBalans'))    el('qarzBalans').textContent    = formatSum(qarzJami);
-    if (el('umumiyBalans'))  el('umumiyBalans').textContent  = formatSum(Math.max(0, umumiy));
+    // Qarzli mijozlardan qarz
+    const mijozlar   = await apiGet('/mijozlar');
+    const qarzJami   = mijozlar.filter(m => m.qarz > 0).reduce((s,m) => s+m.qarz, 0);
 
-    // Rang
-    if (el('naqdBalans'))   el('naqdBalans').style.color   = naqdBalans < 0 ? '#ef4444' : '';
-    if (el('umumiyBalans')) el('umumiyBalans').style.color = umumiy < 0 ? '#ef4444' : '';
+    const el = id => document.getElementById(id);
+    if (el('naqdBalans'))   { el('naqdBalans').textContent   = formatSum(naqdBalans);  el('naqdBalans').style.color  = naqdBalans < 0 ? '#ef4444' : ''; }
+    if (el('kartaBalans'))  { el('kartaBalans').textContent  = formatSum(kartaBalans); }
+    if (el('qarzBalans'))   { el('qarzBalans').textContent   = formatSum(qarzJami);    }
+    if (el('umumiyBalans')) { el('umumiyBalans').textContent = formatSum(umumiy);      el('umumiyBalans').style.color = umumiy < 0 ? '#ef4444' : ''; }
 
   } catch(e) { toast(e.message, 'error'); }
 }
@@ -245,14 +249,15 @@ async function qarzTolashSaqla(e, mijoz_id, joriyQarz) {
     const mijozlar = await apiGet('/mijozlar');
     const mijoz = mijozlar.find(m => m.id == mijoz_id);
     if (!mijoz) { toast('Mijoz topilmadi!', 'error'); return; }
-
     await apiPut('/mijozlar/' + mijoz_id, { ...mijoz, qarz: yangiQarz });
 
-    // Kirim sifatida yozish (kassa harakatlarida ko'rinsin)
-    await apiPost('/xarajatlar', {
+    // Kassa harakati sifatida kiritish (xarajat emas!)
+    await apiPost('/kassa_harakatlari', {
+      tur: 'kirim',
       nomi: `Qarz to'lovi — ${mijoz.ism} ${mijoz.familiya||''}`,
-      summa: -summa,  // Manfiy — bu kirim
-      kategoriya: `Qarz to'lovi (${tolov==='naqd'?'💵 Naqd':'💳 Karta'})`,
+      summa: summa,
+      tolov_turi: tolov,
+      kategoriya: 'Qarz to\'lovi',
       foydalanuvchi_id: joriyFoydalanuvchi.id,
       izoh: izoh || `Qarz to'landi. Qoldi: ${formatSum(yangiQarz)}`
     });
@@ -271,38 +276,45 @@ async function kassaHarakatlariYukla() {
   if (!div) return;
 
   try {
-    const [sotuvlar, xarajatlar, qaytarishlar] = await Promise.all([
+    // Kassa harakatlari (kirim/chiqim) — alohida jadvaldan
+    const [kassa_h, sotuvlar, qaytarishlar] = await Promise.all([
+      apiGet(`/kassa_harakatlari?boshlanish=${bosh}&tugash=${tug}`),
       apiGet(`/sotuvlar?boshlanish=${bosh}&tugash=${tug}`),
-      apiGet(`/xarajatlar?boshlanish=${bosh}&tugash=${tug}`),
       apiGet(`/qaytarishlar?boshlanish=${bosh}&tugash=${tug}`)
     ]);
 
     // Barcha harakatlarni birga yig'ish
     const harakatlar = [
+      // Sotuvlar — kirim
       ...sotuvlar.map(s => ({
-        tur: 'kirim',
-        id: s.id,
+        tur: 'kirim', id: s.id,
         tolov: s.tolov_turi,
         tavsif: `🛒 ${s.chek_raqam}${s.mijoz_ismi ? ' — '+s.mijoz_ismi : ''}`,
         summa: s.jami_summa,
         sana: s.sana,
-        chek_raqam: s.chek_raqam
+        chek_raqam: s.chek_raqam,
+        tip: 'sotuv'
       })),
-      ...xarajatlar.map(x => ({
-        tur: x.summa < 0 ? 'kirim' : 'chiqim',
-        tolov: 'naqd',
-        tavsif: `${x.summa < 0 ? '💰' : '💸'} ${x.nomi} ${x.kategoriya ? '('+x.kategoriya+')' : ''}`,
-        summa: Math.abs(x.summa),
-        sana: x.sana
-      })),
+      // Qaytarishlar — chiqim
       ...qaytarishlar.map(q => ({
         tur: 'chiqim',
         tolov: 'naqd',
-        tavsif: `↩️ Qaytarish ${q.chek_raqam} ${q.sabab ? '— '+q.sabab : ''}`,
+        tavsif: `↩️ ${q.chek_raqam}${q.sabab ? ' — '+q.sabab : ''}`,
         summa: q.jami_summa,
-        sana: q.sana
+        sana: q.sana,
+        tip: 'qaytarish'
+      })),
+      // Kassa harakatlari (qo'lda kiritilgan kirim/chiqim)
+      ...kassa_h.map(h => ({
+        tur: h.tur,
+        tolov: h.tolov_turi,
+        tavsif: `${h.tur === 'kirim' ? '💰' : '💸'} ${h.nomi}${h.kategoriya ? ' ('+h.kategoriya+')' : ''}`,
+        summa: h.summa,
+        sana: h.sana,
+        tip: 'kassa_' + h.tur,
+        izoh: h.izoh
       }))
-    ].sort((a,b) => b.sana.localeCompare(a.sana));
+    ].sort((a, b) => b.sana.localeCompare(a.sana));
 
     if (!harakatlar.length) {
       div.innerHTML = '<div class="empty-state"><i class="fas fa-exchange-alt"></i><p>Bu davrda harakat yo\'q</p></div>';
@@ -311,87 +323,112 @@ async function kassaHarakatlariYukla() {
 
     const jamiKirim  = harakatlar.filter(h => h.tur === 'kirim').reduce((s,h) => s+h.summa, 0);
     const jamiChiqim = harakatlar.filter(h => h.tur === 'chiqim').reduce((s,h) => s+h.summa, 0);
+    const sof = jamiKirim - jamiChiqim;
 
     div.innerHTML = `
-      <div style="display:flex;gap:10px;margin-bottom:12px">
-        <div style="flex:1;padding:10px;background:#f0fdf4;border-radius:8px;text-align:center">
-          <div style="font-size:12px;color:#64748b">Kirim</div>
-          <div style="font-weight:700;color:#10b981">${formatSum(jamiKirim)}</div>
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <div style="flex:1;padding:10px;background:#f0fdf4;border-radius:8px;text-align:center;border:1px solid #bbf7d0">
+          <div style="font-size:11px;color:#166534;font-weight:600">⬇ KIRIM</div>
+          <div style="font-weight:700;color:#10b981;font-size:15px">+${formatSum(jamiKirim)}</div>
         </div>
-        <div style="flex:1;padding:10px;background:#fff1f2;border-radius:8px;text-align:center">
-          <div style="font-size:12px;color:#64748b">Chiqim</div>
-          <div style="font-weight:700;color:#ef4444">${formatSum(jamiChiqim)}</div>
+        <div style="flex:1;padding:10px;background:#fff1f2;border-radius:8px;text-align:center;border:1px solid #fecaca">
+          <div style="font-size:11px;color:#991b1b;font-weight:600">⬆ CHIQIM</div>
+          <div style="font-weight:700;color:#ef4444;font-size:15px">-${formatSum(jamiChiqim)}</div>
         </div>
-        <div style="flex:1;padding:10px;background:#f0f9ff;border-radius:8px;text-align:center">
-          <div style="font-size:12px;color:#64748b">Sof</div>
-          <div style="font-weight:700;color:${jamiKirim-jamiChiqim>=0?'#10b981':'#ef4444'}">
-            ${formatSum(jamiKirim-jamiChiqim)}
+        <div style="flex:1;padding:10px;background:${sof>=0?'#f0f9ff':'#fff1f2'};border-radius:8px;text-align:center;border:1px solid ${sof>=0?'#bae6fd':'#fecaca'}">
+          <div style="font-size:11px;color:#475569;font-weight:600">= SOF</div>
+          <div style="font-weight:700;color:${sof>=0?'#0ea5e9':'#ef4444'};font-size:15px">
+            ${sof>=0?'+':''}${formatSum(sof)}
           </div>
         </div>
       </div>
-      <div style="max-height:340px;overflow-y:auto">
+      <div style="max-height:320px;overflow-y:auto">
         ${harakatlar.map(h => `
           <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;
             border-bottom:1px solid #f1f5f9;font-size:13px;
-            cursor:${h.id&&h.tur==='kirim'?'pointer':'default'}"
-            ${h.id&&h.tur==='kirim'?`onclick="kassaCheckTafsilot(${h.id})"
-              onmouseover="this.style.background='#f8fafc'"
-              onmouseout="this.style.background=''"`:''}>
-            <div style="width:28px;height:28px;border-radius:50%;flex-shrink:0;
+            cursor:${h.id&&h.tip==='sotuv'?'pointer':'default'};
+            transition:background 0.15s"
+            ${h.id&&h.tip==='sotuv'
+              ? `onclick="kassaCheckTafsilot(${h.id})"
+                 onmouseover="this.style.background='#f8fafc'"
+                 onmouseout="this.style.background=''"` : ''}>
+            <div style="width:30px;height:30px;border-radius:50%;flex-shrink:0;
               background:${h.tur==='kirim'?'#dcfce7':'#fee2e2'};
               display:flex;align-items:center;justify-content:center">
               <i class="fas ${h.tur==='kirim'?'fa-arrow-down':'fa-arrow-up'}"
                 style="color:${h.tur==='kirim'?'#10b981':'#ef4444'};font-size:11px"></i>
             </div>
-            <div style="flex:1">
-              <div style="font-size:13px">
+            <div style="flex:1;min-width:0">
+              <div style="font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
                 ${h.tavsif}
-                ${h.id&&h.tur==='kirim'?`<i class="fas fa-eye" style="color:#94a3b8;font-size:10px;margin-left:4px"></i>`:''}
+                ${h.id&&h.tip==='sotuv'
+                  ? '<i class="fas fa-eye" style="color:#94a3b8;font-size:10px;margin-left:4px"></i>' : ''}
               </div>
               <div style="font-size:11px;color:#94a3b8">${formatSana(h.sana)}</div>
             </div>
-            <div style="font-weight:700;${h.tur==='kirim'?'color:#10b981':'color:#ef4444'}">
+            <div style="font-weight:700;white-space:nowrap;
+              color:${h.tur==='kirim'?'#10b981':'#ef4444'}">
               ${h.tur==='kirim'?'+':'-'}${formatSum(h.summa)}
             </div>
           </div>`).join('')}
       </div>`;
   } catch(e) { toast(e.message, 'error'); }
 }
+  } catch(e) { toast(e.message, 'error'); }
+}
 
 
-// ===== CHIQIM QO'SHISH =====
+// ===== CHIQIM / KIRIM QO'SHISH =====
 function chiqimQosh() {
-  const kategoriyalar = [
-    'Ijara', 'Maosh', 'Kommunal (suv/gaz/elektr)', 
-    'Yuk tashish', 'Ta\'mirlash', 'Ofis xarajatlari',
-    'Soliq', 'Bank xizmati', 'Boshqa'
-  ];
-  modalOch('💸 Yangi chiqim', `
-    <form onsubmit="chiqimSaqlash(event)">
+  kassaHarakatModalOch('chiqim');
+}
+
+function kirimQosh() {
+  kassaHarakatModalOch('kirim');
+}
+
+function kassaHarakatModalOch(tur) {
+  const isKirim = tur === 'kirim';
+  const ranglar = isKirim
+    ? { bg: '#f0fdf4', border: '#bbf7d0', btn: 'btn-success', icon: 'fa-plus-circle', rang: '#10b981' }
+    : { bg: '#fff1f2', border: '#fecaca', btn: 'btn-danger',  icon: 'fa-minus-circle', rang: '#ef4444' };
+
+  const kategoriyalar = isKirim
+    ? ['Sotuv tushumi', 'Investor puli', 'Qarz olindi', 'Boshqa kirim']
+    : ['Ijara', 'Maosh', 'Kommunal', 'Yuk tashish', 'Ta\'mirlash', 'Soliq', 'Bank xizmati', 'Boshqa chiqim'];
+
+  modalOch(`${isKirim ? '💰 Kassaga kirim' : '💸 Kassadan chiqim'}`, `
+    <form onsubmit="kassaHarakatSaqla(event,'${tur}')">
+      <div style="background:${ranglar.bg};border:1px solid ${ranglar.border};border-radius:10px;
+        padding:12px;margin-bottom:16px;text-align:center;font-size:13px;color:${ranglar.rang}">
+        <i class="fas ${ranglar.icon}" style="font-size:20px;margin-bottom:4px;display:block"></i>
+        <b>${isKirim ? 'Kassaga pul kirishi' : 'Kassadan pul chiqishi'}</b> sifatida qayd etiladi
+      </div>
+
       <div class="form-group">
-        <label style="font-weight:600">Chiqim nomi *</label>
+        <label style="font-weight:600">Tavsif *</label>
         <input type="text" name="nomi" required autofocus
           style="width:100%;padding:10px;border:2px solid #e2e8f0;border-radius:8px;font-size:14px"
-          placeholder="Masalan: Oylik ijara, Maosh...">
+          placeholder="${isKirim ? 'Masalan: Sotuv tushumi, Qarz olindi...' : 'Masalan: Ijara to\'lovi, Maosh...'}">
       </div>
 
       <div class="form-row">
         <div class="form-group">
           <label style="font-weight:600">Summa (so'm) *</label>
           <input type="number" name="summa" min="1" required
-            style="width:100%;padding:10px;border:2px solid #e2e8f0;border-radius:8px;font-size:14px"
+            style="width:100%;padding:10px;border:2px solid #e2e8f0;border-radius:8px;font-size:15px;font-weight:600"
             placeholder="0">
         </div>
         <div class="form-group">
-          <label style="font-weight:600">To'lov turi</label>
+          <label style="font-weight:600">Pul turi</label>
           <div style="display:flex;gap:6px;margin-top:4px">
-            <label style="display:flex;align-items:center;gap:5px;padding:8px 10px;
+            <label style="display:flex;align-items:center;gap:5px;padding:9px 10px;
               border:2px solid #e2e8f0;border-radius:8px;cursor:pointer;flex:1;font-size:13px">
-              <input type="radio" name="tolov_chiqim" value="naqd" checked> 💵 Naqd
+              <input type="radio" name="tolov_turi" value="naqd" checked> 💵 Naqd
             </label>
-            <label style="display:flex;align-items:center;gap:5px;padding:8px 10px;
+            <label style="display:flex;align-items:center;gap:5px;padding:9px 10px;
               border:2px solid #e2e8f0;border-radius:8px;cursor:pointer;flex:1;font-size:13px">
-              <input type="radio" name="tolov_chiqim" value="karta"> 💳 Karta
+              <input type="radio" name="tolov_turi" value="karta"> 💳 Karta
             </label>
           </div>
         </div>
@@ -402,7 +439,7 @@ function chiqimQosh() {
         <select name="kategoriya"
           style="width:100%;padding:10px;border:2px solid #e2e8f0;border-radius:8px;font-size:14px;background:white">
           <option value="">— Tanlang —</option>
-          ${kategoriyalar.map(k => `<option value="${k}">${k}</option>`).join('')}
+          ${kategoriyalar.map(k => `<option>${k}</option>`).join('')}
         </select>
       </div>
 
@@ -410,45 +447,41 @@ function chiqimQosh() {
         <label style="font-weight:600">Izoh</label>
         <input type="text" name="izoh"
           style="width:100%;padding:10px;border:2px solid #e2e8f0;border-radius:8px;font-size:14px"
-          placeholder="Ixtiyoriy izoh...">
-      </div>
-
-      <div style="background:#fff1f2;border:1px solid #fecaca;border-radius:8px;
-        padding:10px 14px;margin-bottom:12px;font-size:13px;color:#991b1b">
-        <i class="fas fa-info-circle"></i>
-        Bu chiqim kassa hisobidan ayiriladi va xarajatlar ro'yxatida ko'rinadi.
+          placeholder="Ixtiyoriy...">
       </div>
 
       <div class="modal-footer" style="padding:0">
         <button type="button" class="btn btn-secondary" onclick="modalYop()">Bekor</button>
-        <button type="submit" class="btn btn-danger">
-          <i class="fas fa-minus-circle"></i> Chiqim kiritish
+        <button type="submit" class="btn ${ranglar.btn}">
+          <i class="fas ${ranglar.icon}"></i>
+          ${isKirim ? 'Kirim kiritish' : 'Chiqim kiritish'}
         </button>
       </div>
     </form>`);
 }
 
-async function chiqimSaqlash(e) {
+async function kassaHarakatSaqla(e, tur) {
   e.preventDefault();
   const form = e.target;
-  const summa   = parseFloat(form.summa.value) || 0;
-  const nomi    = form.nomi.value.trim();
-  const tolov   = form.querySelector('[name=tolov_chiqim]:checked')?.value || 'naqd';
-  const kateg   = form.kategoriya.value;
-  const izoh    = form.izoh.value.trim();
+  const data = {
+    tur:             tur,
+    nomi:            form.nomi.value.trim(),
+    summa:           parseFloat(form.summa.value) || 0,
+    tolov_turi:      form.querySelector('[name=tolov_turi]:checked')?.value || 'naqd',
+    kategoriya:      form.kategoriya.value,
+    izoh:            form.izoh.value.trim(),
+    foydalanuvchi_id: joriyFoydalanuvchi?.id || null
+  };
 
-  if (!nomi || summa <= 0) { toast('Nomi va summa kiritilishi shart!', 'warning'); return; }
+  if (!data.nomi || data.summa <= 0) {
+    toast('Tavsif va summa kiritilishi shart!', 'warning'); return;
+  }
 
   try {
-    await apiPost('/xarajatlar', {
-      nomi: nomi,
-      summa: summa,
-      kategoriya: kateg || 'Boshqa',
-      foydalanuvchi_id: joriyFoydalanuvchi.id,
-      izoh: izoh || `${tolov === 'naqd' ? '💵 Naqd' : '💳 Karta'} to\'landi`
-    });
+    await apiPost('/kassa_harakatlari', data);
     modalYop();
-    toast(`✅ Chiqim kiritildi: ${formatSum(summa)}`, 'success');
+    const sign = tur === 'kirim' ? '+' : '-';
+    toast(`✅ ${tur === 'kirim' ? 'Kirim' : 'Chiqim'}: ${sign}${formatSum(data.summa)}`, 'success');
     kassaHisobiYukla();
   } catch(err) { toast(err.message, 'error'); }
 }

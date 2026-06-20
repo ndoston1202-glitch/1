@@ -114,6 +114,18 @@ def init_db():
         izoh TEXT,
         sana TEXT DEFAULT (datetime('now','localtime'))
     );
+    CREATE TABLE IF NOT EXISTS kassa_harakatlari (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        tur TEXT NOT NULL,
+        nomi TEXT NOT NULL,
+        summa REAL NOT NULL,
+        tolov_turi TEXT DEFAULT 'naqd',
+        kategoriya TEXT,
+        foydalanuvchi_id INTEGER,
+        foydalanuvchi_ismi TEXT,
+        izoh TEXT,
+        sana TEXT DEFAULT (datetime('now','localtime'))
+    );
     """)
     conn.commit()
     admin = c.execute("SELECT id FROM foydalanuvchilar WHERE username='admin'").fetchone()
@@ -148,14 +160,23 @@ def init_db():
     try:
         conn.execute("""CREATE TABLE IF NOT EXISTS mahsulot_logi (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            amal TEXT NOT NULL,
-            mahsulot_id INTEGER,
-            mahsulot_nomi TEXT NOT NULL,
+            amal TEXT NOT NULL, mahsulot_id INTEGER,
+            mahsulot_nomi TEXT NOT NULL, kategoriya TEXT, birlik TEXT,
+            kelish_narxi REAL, sotish_narxi REAL, miqdor REAL,
+            foydalanuvchi_id INTEGER, foydalanuvchi_ismi TEXT, izoh TEXT,
+            sana TEXT DEFAULT (datetime('now','localtime'))
+        )""")
+        conn.commit()
+    except: pass
+    # kassa_harakatlari jadvalini yaratish (migration)
+    try:
+        conn.execute("""CREATE TABLE IF NOT EXISTS kassa_harakatlari (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tur TEXT NOT NULL,
+            nomi TEXT NOT NULL,
+            summa REAL NOT NULL,
+            tolov_turi TEXT DEFAULT 'naqd',
             kategoriya TEXT,
-            birlik TEXT,
-            kelish_narxi REAL,
-            sotish_narxi REAL,
-            miqdor REAL,
             foydalanuvchi_id INTEGER,
             foydalanuvchi_ismi TEXT,
             izoh TEXT,
@@ -391,6 +412,16 @@ class Handler(BaseHTTPRequestHandler):
                 """).fetchall())
                 return self.send_json(rows)
 
+            # KASSA HARAKATLARI (kirim/chiqim)
+            if path == '/api/kassa_harakatlari':
+                params = []
+                sql = "SELECT * FROM kassa_harakatlari WHERE 1=1"
+                if qp('boshlanish'): sql += " AND date(sana)>=?"; params.append(qp('boshlanish'))
+                if qp('tugash'):     sql += " AND date(sana)<=?"; params.append(qp('tugash'))
+                if qp('tur'):        sql += " AND tur=?";         params.append(qp('tur'))
+                sql += " ORDER BY sana DESC"
+                return self.send_json(rows_to_list(conn.execute(sql, params).fetchall()))
+
             # JURNAL — barcha operatsiyalar
             if path == '/api/jurnal':
                 bosh = qp('boshlanish') or datetime.now().strftime('%Y-%m-%d')
@@ -464,8 +495,24 @@ class Handler(BaseHTTPRequestHandler):
                     """, (bosh, tug)).fetchall()
                     operatsiyalar += [dict(r) for r in rows]
 
-                # MAHSULOT LOGLARI
-                if tur in ('barchasi','mahsulot'):
+                # KASSA HARAKATLARI (kirim/chiqim)
+                if tur in ('barchasi','kassakirim','kassachiqim'):
+                    tur_filter = ""
+                    if tur == 'kassakirim':  tur_filter = " AND tur='kirim'"
+                    if tur == 'kassachiqim': tur_filter = " AND tur='chiqim'"
+                    rows = conn.execute(f"""
+                        SELECT id, tur,
+                            'KH'||id as raqam,
+                            summa, '' as tolov_turi,
+                            '' as mijoz_ismi, sana,
+                            kategoriya as sabab,
+                            COALESCE(foydalanuvchi_ismi,'Tizim') as xodim,
+                            0 as mahsulotlar_soni,
+                            nomi as mahsulot_nomi, izoh
+                        FROM kassa_harakatlari
+                        WHERE date(sana)>=? AND date(sana)<=?{tur_filter}
+                    """, (bosh, tug)).fetchall()
+                    operatsiyalar += [dict(r) for r in rows]
                     rows = conn.execute("""
                         SELECT l.id, l.amal as tur,
                             'MAH'||l.id as raqam,
@@ -598,7 +645,24 @@ class Handler(BaseHTTPRequestHandler):
                     (body['nomi'],body['summa'],body.get('kategoriya',''),body.get('foydalanuvchi_id'),body.get('izoh','')))
                 conn.commit(); return self.send_json({'muvaffaqiyat':True})
 
-            # QAYTARISH
+            # KASSA HARAKATI (kirim/chiqim)
+            if path == '/api/kassa_harakatlari':
+                tur    = body.get('tur', 'chiqim')  # 'kirim' yoki 'chiqim'
+                nomi   = body.get('nomi', '')
+                summa  = abs(float(body.get('summa', 0)))
+                tolov  = body.get('tolov_turi', 'naqd')
+                kateg  = body.get('kategoriya', '')
+                izoh   = body.get('izoh', '')
+                f_id   = body.get('foydalanuvchi_id')
+                fism   = ''
+                if f_id:
+                    fu = conn.execute("SELECT ism,familiya FROM foydalanuvchilar WHERE id=?", (f_id,)).fetchone()
+                    if fu: fism = fu['ism'] + ' ' + fu['familiya']
+                conn.execute(
+                    "INSERT INTO kassa_harakatlari (tur,nomi,summa,tolov_turi,kategoriya,foydalanuvchi_id,foydalanuvchi_ismi,izoh) VALUES (?,?,?,?,?,?,?,?)",
+                    (tur, nomi, summa, tolov, kateg, f_id, fism, izoh))
+                conn.commit()
+                return self.send_json({'muvaffaqiyat': True})
             if path == '/api/qaytarishlar':
                 mahsulotlar = body.get('mahsulotlar', [])
                 if not mahsulotlar: return self.send_error_json('Mahsulot tanlanmagan!')
