@@ -374,8 +374,6 @@ async function kassaHarakatlariYukla() {
       </div>`;
   } catch(e) { toast(e.message, 'error'); }
 }
-  } catch(e) { toast(e.message, 'error'); }
-}
 
 
 // ===== CHIQIM / KIRIM QO'SHISH =====
