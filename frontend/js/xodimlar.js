@@ -61,10 +61,12 @@ async function xodimlarRoyxatYukla() {
                       ${x.rol==='admin'?'👑 Admin':'💼 Kassir'}
                     </span>
                     ${x.username !== 'admin' ? `
-                      <button class="btn btn-secondary btn-sm" style="font-size:11px;padding:2px 8px"
+                      <button class="btn btn-sm" 
+                        style="font-size:11px;padding:3px 10px;background:${x.rol==='admin'?'#dbeafe':'#fef3c7'};color:${x.rol==='admin'?'#1d4ed8':'#92400e'};border:1px solid ${x.rol==='admin'?'#93c5fd':'#fcd34d'};border-radius:6px;cursor:pointer"
                         onclick="rolTezOzgartir(${x.id},'${x.rol}','${x.ism} ${x.familiya}')"
-                        title="Rolni o'zgartirish">
+                        title="${x.rol==='admin'?'Kassirga o\'tkazish':'Adminga o\'tkazish'}">
                         <i class="fas fa-exchange-alt"></i>
+                        ${x.rol==='admin'?'→ Kassir':'→ Admin'}
                       </button>` : ''}
                   </div>
                 </td>
@@ -99,44 +101,40 @@ async function xodimlarRoyxatYukla() {
 }
 
 // ===== ROLNI TEZDA O'ZGARTIRISH =====
-function rolTezOzgartir(id, joriyRol, ism) {
+async function rolTezOzgartir(id, joriyRol, ism) {
   const yangiRol = joriyRol === 'admin' ? 'kassir' : 'admin';
-  const yangiRolNomi = yangiRol === 'admin' ? '👑 Admin' : '💼 Kassir';
+  const yangiIcon = yangiRol === 'admin' ? '👑' : '💼';
+  const yangiNomi = yangiRol === 'admin' ? 'Admin' : 'Kassir';
+
+  window._tasdiqlashCallback = async () => {
+    try {
+      const xodimlar = await apiGet('/foydalanuvchilar');
+      const x = xodimlar.find(u => u.id == id);
+      if (!x) return;
+      await apiPut('/foydalanuvchilar/' + id, { ...x, rol: yangiRol, faol: x.faol });
+      toast(`✅ ${ism} → ${yangiIcon} ${yangiNomi}`, 'success');
+      xodimlarRoyxatYukla();
+    } catch (e) { toast(e.message, 'error'); }
+  };
+
   modalOch('Rolni o\'zgartirish', `
     <div style="text-align:center;padding:10px">
-      <i class="fas fa-exchange-alt fa-3x" style="color:#f59e0b;margin-bottom:16px"></i>
-      <p style="font-size:15px;margin-bottom:8px">
-        <b>"${ism}"</b> xodimining rolini o'zgartirmoqchimisiz?
+      <div style="font-size:48px;margin-bottom:12px">${yangiIcon}</div>
+      <p style="font-size:15px;margin-bottom:4px">
+        <b>"${ism}"</b>
       </p>
-      <div style="display:flex;justify-content:center;align-items:center;gap:16px;margin:16px 0">
-        <span class="badge ${joriyRol==='admin'?'badge-warning':'badge-info'}" style="font-size:14px;padding:6px 16px">
-          ${joriyRol==='admin'?'👑 Admin':'💼 Kassir'}
-        </span>
-        <i class="fas fa-arrow-right" style="color:#64748b"></i>
-        <span class="badge ${yangiRol==='admin'?'badge-warning':'badge-info'}" style="font-size:14px;padding:6px 16px">
-          ${yangiRolNomi}
-        </span>
-      </div>
-      <div class="modal-footer" style="padding:0;margin-top:10px;justify-content:center">
+      <p style="color:#64748b;font-size:14px;margin-bottom:20px">
+        ${joriyRol==='admin'?'👑 Admin':'💼 Kassir'} 
+        <i class="fas fa-arrow-right" style="margin:0 8px;color:#94a3b8"></i> 
+        ${yangiIcon} ${yangiNomi}
+      </p>
+      <div style="display:flex;gap:8px;justify-content:center">
         <button class="btn btn-secondary" onclick="modalYop()">Bekor</button>
-        <button class="btn btn-warning" style="margin-left:8px"
-          onclick="rolniSaqla(${id},'${yangiRol}')">
+        <button class="btn btn-warning" onclick="modalYop();window._tasdiqlashCallback()">
           <i class="fas fa-check"></i> Tasdiqlash
         </button>
       </div>
     </div>`);
-}
-
-async function rolniSaqla(id, yangiRol) {
-  try {
-    const xodimlar = await apiGet('/foydalanuvchilar');
-    const x = xodimlar.find(u => u.id == id);
-    if (!x) return;
-    await apiPut('/foydalanuvchilar/' + id, { ...x, rol: yangiRol, faol: x.faol });
-    toast(`✅ Rol o'zgartirildi: ${yangiRol === 'admin' ? '👑 Admin' : '💼 Kassir'}`, 'success');
-    modalYop();
-    xodimlarRoyxatYukla();
-  } catch (e) { toast(e.message, 'error'); }
 }
 
 // ===== HOLATNI TEZDA O'ZGARTIRISH =====
