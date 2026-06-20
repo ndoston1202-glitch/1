@@ -2,10 +2,38 @@ let mahsulotlarRoyxat = [];
 let kategoriyalarRoyxat = [];
 let joriySahifa = 1;
 const SAHIFADAGI_SON = 20;
+let omborMahsulotTab = 'mahsulotlar'; // 'mahsulotlar' yoki 'ombor'
 
-async function mahsulotlarYukla() {
+async function mahsulotlarYukla(tab) {
+  omborMahsulotTab = tab || 'mahsulotlar';
   const kontent = document.getElementById('asosiyKontent');
   kontent.innerHTML = `
+    <!-- TAB MENU -->
+    <div style="display:flex;gap:8px;margin-bottom:16px;border-bottom:2px solid #e2e8f0;padding-bottom:0">
+      <button onclick="mahsulotlarYukla('mahsulotlar')"
+        style="padding:10px 20px;border:none;background:none;cursor:pointer;font-size:15px;font-weight:600;
+        border-bottom:3px solid ${omborMahsulotTab==='mahsulotlar'?'#2563eb':'transparent'};
+        color:${omborMahsulotTab==='mahsulotlar'?'#2563eb':'#64748b'};margin-bottom:-2px">
+        <i class="fas fa-boxes"></i> Mahsulotlar
+      </button>
+      <button onclick="mahsulotlarYukla('ombor')"
+        style="padding:10px 20px;border:none;background:none;cursor:pointer;font-size:15px;font-weight:600;
+        border-bottom:3px solid ${omborMahsulotTab==='ombor'?'#2563eb':'transparent'};
+        color:${omborMahsulotTab==='ombor'?'#2563eb':'#64748b'};margin-bottom:-2px">
+        <i class="fas fa-warehouse"></i> Ombor
+      </button>
+    </div>
+    <div id="omborMahsulotKontent"></div>`;
+
+  if (omborMahsulotTab === 'mahsulotlar') {
+    await mahsulotlarTabYukla();
+  } else {
+    await omborYuklaTab();
+  }
+}
+
+async function mahsulotlarTabYukla() {
+  document.getElementById('omborMahsulotKontent').innerHTML = `
     <div class="card">
       <div class="card-header">
         <div class="filter-bar">
@@ -44,6 +72,45 @@ async function mahsulotlarYukla() {
     const sel = document.getElementById('mahKategoriya');
     kategoriyalarRoyxat.forEach(k => sel.innerHTML += `<option value="${k.id}">${k.nomi}</option>`);
     mahsulotlarKorsatish(mahsulotlarRoyxat);
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+async function omborYuklaTab() {
+  document.getElementById('omborMahsulotKontent').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;flex-wrap:wrap">
+      <div class="card">
+        <div class="card-header">
+          <h3><i class="fas fa-warehouse"></i> Inventar holati</h3>
+          <div style="display:flex;gap:8px">
+            <select id="omborKatFilter" class="filter-select" onchange="inventarYukla()">
+              <option value="">Barcha kategoriyalar</option>
+            </select>
+            <button class="btn btn-primary btn-sm" onclick="kirimModalOch()"><i class="fas fa-plus"></i> Kirim</button>
+          </div>
+        </div>
+        <div class="card-body" id="inventarRoyxat">
+          <div style="text-align:center"><i class="fas fa-spinner fa-spin"></i></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <h3><i class="fas fa-history"></i> Kirim tarixi</h3>
+          <div class="filter-bar">
+            <input type="date" id="omborBosh" class="search-input" style="width:140px" value="${bugunSana()}" onchange="kirimTarixYukla()">
+            <input type="date" id="omborTugash" class="search-input" style="width:140px" value="${bugunSana()}" onchange="kirimTarixYukla()">
+          </div>
+        </div>
+        <div class="card-body" id="kirimTarix">
+          <div style="text-align:center"><i class="fas fa-spinner fa-spin"></i></div>
+        </div>
+      </div>
+    </div>`;
+
+  try {
+    const kategoriyalar = await apiGet('/kategoriyalar');
+    const sel = document.getElementById('omborKatFilter');
+    kategoriyalar.forEach(k => sel.innerHTML += `<option value="${k.id}">${k.nomi}</option>`);
+    await Promise.all([inventarYukla(), kirimTarixYukla()]);
   } catch (e) { toast(e.message, 'error'); }
 }
 
