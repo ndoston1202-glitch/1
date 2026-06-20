@@ -137,20 +137,19 @@ async function kassaYukla() {
       tanlangan_mijoz = xotira.tanlangan_mijoz;
       chekKorsatish();
       setTimeout(() => {
-        if (document.getElementById('chegirmaInput'))
-          document.getElementById('chegirmaInput').value = xotira.chegirma || '';
-        if (document.getElementById('tolovTuri') && xotira.tolov_turi)
-          document.getElementById('tolovTuri').value = xotira.tolov_turi;
+        const chegirmaEl = document.getElementById('chegirmaInput');
+        if (chegirmaEl) chegirmaEl.value = xotira.chegirma || '';
         if (tanlangan_mijoz) mijozBlokniyaJila();
         chekHisoba();
-      }, 50);
+      }, 100);
       toast('💾 Oxirgi chek qayta yuklandi', 'success');
     } else {
       chekMahsulotlar = [];
       tanlangan_mijoz = null;
     }
     kassaMahsulotKorsatish(kassaMahsulotlar);
-    tolovQatorlarniBoshlash();
+    // To'lov qatorlarini HTML tayyor bo'lgandan keyin boshlash
+    setTimeout(() => tolovQatorlarniBoshlash(), 0);
   } catch(e) { toast(e.message, 'error'); }
 }
 
@@ -178,7 +177,6 @@ function tolovQatorKorsatishOptions(tanlangan) {
 function tolovQatorlarKorsatish() {
   const div = document.getElementById('tolovQatorlar');
   if (!div) return;
-
   div.innerHTML = tolovQatorlarData.map((q, i) => `
     <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
       <select onchange="tolovTurOzgartir(${i},this.value)"
@@ -588,7 +586,8 @@ function chekHisoba() {
   const yakuniy=Math.max(0,jami-chegirma);
   const jEl=document.getElementById('chekJami'); if(jEl) jEl.textContent=formatSum(jami);
   const yEl=document.getElementById('chekYakuniy'); if(yEl) yEl.textContent=formatSum(yakuniy);
-  tolovQolganniHisoba();
+  // Div tayyor bo'lsa to'lov qolganini yangilaymiz
+  if(document.getElementById('tolovQolgan')) tolovQolganniHisoba();
 }
 
 
