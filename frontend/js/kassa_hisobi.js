@@ -58,11 +58,14 @@ async function kassaHisobiYukla() {
         <div class="card">
           <div class="card-header">
             <h3><i class="fas fa-exchange-alt"></i> Kassa harakatlari</h3>
-            <div class="filter-bar">
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
               <input type="date" id="kassaHBosh" value="${oyBoshi}" class="search-input"
                 onchange="kassaHarakatlariYukla()" style="width:130px">
               <input type="date" id="kassaHTugash" value="${bugun}" class="search-input"
                 onchange="kassaHarakatlariYukla()" style="width:130px">
+              <button class="btn btn-danger btn-sm" onclick="chiqimQosh()">
+                <i class="fas fa-minus-circle"></i> Chiqim
+              </button>
             </div>
           </div>
           <div class="card-body" id="kassaHarakatlariDiv">
@@ -355,6 +358,100 @@ async function kassaHarakatlariYukla() {
   } catch(e) { toast(e.message, 'error'); }
 }
 
+
+// ===== CHIQIM QO'SHISH =====
+function chiqimQosh() {
+  const kategoriyalar = [
+    'Ijara', 'Maosh', 'Kommunal (suv/gaz/elektr)', 
+    'Yuk tashish', 'Ta\'mirlash', 'Ofis xarajatlari',
+    'Soliq', 'Bank xizmati', 'Boshqa'
+  ];
+  modalOch('💸 Yangi chiqim', `
+    <form onsubmit="chiqimSaqlash(event)">
+      <div class="form-group">
+        <label style="font-weight:600">Chiqim nomi *</label>
+        <input type="text" name="nomi" required autofocus
+          style="width:100%;padding:10px;border:2px solid #e2e8f0;border-radius:8px;font-size:14px"
+          placeholder="Masalan: Oylik ijara, Maosh...">
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label style="font-weight:600">Summa (so'm) *</label>
+          <input type="number" name="summa" min="1" required
+            style="width:100%;padding:10px;border:2px solid #e2e8f0;border-radius:8px;font-size:14px"
+            placeholder="0">
+        </div>
+        <div class="form-group">
+          <label style="font-weight:600">To'lov turi</label>
+          <div style="display:flex;gap:6px;margin-top:4px">
+            <label style="display:flex;align-items:center;gap:5px;padding:8px 10px;
+              border:2px solid #e2e8f0;border-radius:8px;cursor:pointer;flex:1;font-size:13px">
+              <input type="radio" name="tolov_chiqim" value="naqd" checked> 💵 Naqd
+            </label>
+            <label style="display:flex;align-items:center;gap:5px;padding:8px 10px;
+              border:2px solid #e2e8f0;border-radius:8px;cursor:pointer;flex:1;font-size:13px">
+              <input type="radio" name="tolov_chiqim" value="karta"> 💳 Karta
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label style="font-weight:600">Kategoriya</label>
+        <select name="kategoriya"
+          style="width:100%;padding:10px;border:2px solid #e2e8f0;border-radius:8px;font-size:14px;background:white">
+          <option value="">— Tanlang —</option>
+          ${kategoriyalar.map(k => `<option value="${k}">${k}</option>`).join('')}
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label style="font-weight:600">Izoh</label>
+        <input type="text" name="izoh"
+          style="width:100%;padding:10px;border:2px solid #e2e8f0;border-radius:8px;font-size:14px"
+          placeholder="Ixtiyoriy izoh...">
+      </div>
+
+      <div style="background:#fff1f2;border:1px solid #fecaca;border-radius:8px;
+        padding:10px 14px;margin-bottom:12px;font-size:13px;color:#991b1b">
+        <i class="fas fa-info-circle"></i>
+        Bu chiqim kassa hisobidan ayiriladi va xarajatlar ro'yxatida ko'rinadi.
+      </div>
+
+      <div class="modal-footer" style="padding:0">
+        <button type="button" class="btn btn-secondary" onclick="modalYop()">Bekor</button>
+        <button type="submit" class="btn btn-danger">
+          <i class="fas fa-minus-circle"></i> Chiqim kiritish
+        </button>
+      </div>
+    </form>`);
+}
+
+async function chiqimSaqlash(e) {
+  e.preventDefault();
+  const form = e.target;
+  const summa   = parseFloat(form.summa.value) || 0;
+  const nomi    = form.nomi.value.trim();
+  const tolov   = form.querySelector('[name=tolov_chiqim]:checked')?.value || 'naqd';
+  const kateg   = form.kategoriya.value;
+  const izoh    = form.izoh.value.trim();
+
+  if (!nomi || summa <= 0) { toast('Nomi va summa kiritilishi shart!', 'warning'); return; }
+
+  try {
+    await apiPost('/xarajatlar', {
+      nomi: nomi,
+      summa: summa,
+      kategoriya: kateg || 'Boshqa',
+      foydalanuvchi_id: joriyFoydalanuvchi.id,
+      izoh: izoh || `${tolov === 'naqd' ? '💵 Naqd' : '💳 Karta'} to\'landi`
+    });
+    modalYop();
+    toast(`✅ Chiqim kiritildi: ${formatSum(summa)}`, 'success');
+    kassaHisobiYukla();
+  } catch(err) { toast(err.message, 'error'); }
+}
 
 // ===== SOTUV CHEKIGA BOSGANIDA TAFSILOT =====
 async function kassaCheckTafsilot(sotuv_id) {
