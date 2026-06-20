@@ -80,7 +80,12 @@ function mahsulotlarKorsatish(royxat) {
           ${sahifadagilar.map((m, i) => `
             <tr>
               <td>${bosh + i + 1}</td>
-              <td><b>${m.nomi}</b></td>
+              <td>
+                <div style="display:flex;align-items:center;gap:8px">
+                  ${m.rasm ? `<img src="${m.rasm}" style="width:36px;height:36px;object-fit:cover;border-radius:6px;flex-shrink:0">` : `<div style="width:36px;height:36px;background:#f1f5f9;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="fas fa-box" style="color:#cbd5e1"></i></div>`}
+                  <b>${m.nomi}</b>
+                </div>
+              </td>
               <td><span class="badge badge-secondary">${m.kategoriya_nomi || '-'}</span></td>
               <td style="font-family:monospace;font-size:12px">${m.shtrix_kod || '-'}</td>
               <td>${m.birlik}</td>
@@ -187,11 +192,38 @@ function mahsulotFormKontent(m = null) {
         <label>Tavsif</label>
         <textarea name="tavsif" rows="2" style="resize:vertical">${m ? (m.tavsif || '') : ''}</textarea>
       </div>
+
+      <!-- RASM -->
+      <div class="form-group">
+        <label><i class="fas fa-image"></i> Mahsulot rasmi</label>
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <div id="rasmPreview" style="width:80px;height:80px;border:2px dashed #e2e8f0;border-radius:8px;
+            display:flex;align-items:center;justify-content:center;overflow:hidden;background:#f8fafc;flex-shrink:0">
+            ${m && m.rasm
+              ? `<img src="${m.rasm}" style="width:100%;height:100%;object-fit:cover;border-radius:6px">`
+              : '<i class="fas fa-image fa-2x" style="color:#cbd5e1"></i>'}
+          </div>
+          <div style="flex:1">
+            <input type="file" id="rasmFaylInput" accept="image/*" onchange="rasmTanlash(this)"
+              style="display:none">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('rasmFaylInput').click()">
+              <i class="fas fa-upload"></i> Rasm tanlash
+            </button>
+            ${m && m.rasm ? `<button type="button" class="btn btn-danger btn-sm" style="margin-left:6px" onclick="rasmOchir()">
+              <i class="fas fa-times"></i> O'chirish
+            </button>` : ''}
+            <div style="font-size:11px;color:#94a3b8;margin-top:4px">PNG, JPG, JPEG (max 1MB)</div>
+          </div>
+        </div>
+        <input type="hidden" name="rasm" id="rasmInput" value="${m ? (m.rasm || '') : ''}">
+      </div>
+
       <div class="modal-footer" style="padding:0;margin-top:10px">
         <button type="button" class="btn btn-secondary" onclick="modalYop()">Bekor</button>
         <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Saqlash</button>
       </div>
     </form>`;
+}
 }
 
 async function mahsulotSaqlash(e, id) {
@@ -206,7 +238,8 @@ async function mahsulotSaqlash(e, id) {
     miqdor: parseFloat(form.miqdor.value) || 0,
     min_miqdor: parseFloat(form.min_miqdor.value) || 5,
     shtrix_kod: form.shtrix_kod.value || null,
-    tavsif: form.tavsif.value
+    tavsif: form.tavsif.value,
+    rasm: document.getElementById('rasmInput')?.value || null
   };
   try {
     if (id) { await apiPut('/mahsulotlar/' + id, data); toast('Mahsulot yangilandi!'); }
@@ -214,6 +247,27 @@ async function mahsulotSaqlash(e, id) {
     modalYop();
     mahsulotlarYukla();
   } catch (e) { toast(e.message, 'error'); }
+}
+
+// ===== RASM FUNKSIYALARI =====
+function rasmTanlash(input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (file.size > 1024 * 1024) { toast('Rasm 1MB dan kichik bo\'lsin!', 'warning'); return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    const base64 = e.target.result;
+    document.getElementById('rasmInput').value = base64;
+    const preview = document.getElementById('rasmPreview');
+    if (preview) preview.innerHTML = `<img src="${base64}" style="width:100%;height:100%;object-fit:cover;border-radius:6px">`;
+  };
+  reader.readAsDataURL(file);
+}
+
+function rasmOchir() {
+  document.getElementById('rasmInput').value = '';
+  const preview = document.getElementById('rasmPreview');
+  if (preview) preview.innerHTML = '<i class="fas fa-image fa-2x" style="color:#cbd5e1"></i>';
 }
 
 // ===== O'CHIRISH — miqdor 0 bo'lishi shart =====

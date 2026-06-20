@@ -28,7 +28,8 @@ let _barcha_mijozlar = [];
 async function mijozlarRoyxatYukla() {
   try {
     _barcha_mijozlar = await apiGet('/mijozlar');
-    mijozlarJadvalKorsatish(_barcha_mijozlar);
+    const div = document.getElementById('mijozlarJadval');
+    if (div) mijozlarJadvalKorsatish(_barcha_mijozlar);
   } catch (e) { toast(e.message, 'error'); }
 }
 
@@ -43,6 +44,7 @@ function mijozlarSahifaFilter() {
 
 function mijozlarJadvalKorsatish(royxat) {
   const div = document.getElementById('mijozlarJadval');
+  if (!div) return;
   if (!royxat.length) {
     div.innerHTML = '<div class="empty-state"><i class="fas fa-users"></i><p>Mijoz topilmadi</p></div>';
     return;
@@ -306,27 +308,3 @@ async function mijozCSVYukla() {
 
 // CSV faylni o'qish
 function csvFaylOqi(input, targetId) {
-  const file = input.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = e => {
-    let text = e.target.result;
-    if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
-    document.getElementById(targetId).value = text;
-  };
-  reader.readAsText(file, 'UTF-8');
-}
-
-async function mijozCSVYukla() {
-  const csv = document.getElementById('mijozCSVMatn').value.trim();
-  if (!csv) { toast('CSV matn bo\'sh!', 'warning'); return; }
-  try {
-    const r = await apiPost('/import/mijozlar', { csv });
-    modalYop();
-    toast(`✅ ${r.qoshildi} ta mijoz qo'shildi!`, 'success');
-    if (r.xatolar && r.xatolar.length) {
-      setTimeout(() => toast(`⚠ ${r.xatolar.length} ta xato: ${r.xatolar[0]}`, 'warning'), 3500);
-    }
-    mijozlarRoyxatYukla();
-  } catch (e) { toast(e.message, 'error'); }
-}

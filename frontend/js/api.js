@@ -62,12 +62,14 @@ function modalYop() {
 }
 
 // ===== TASDIQLASH =====
+window._tasdiqlashCallback = null;
 function tasdiqlash(xabar, callback) {
+  window._tasdiqlashCallback = callback;
   const kontent = `
     <p style="margin-bottom:20px;font-size:15px;">${xabar}</p>
     <div class="modal-footer" style="padding:0">
       <button class="btn btn-secondary" onclick="modalYop()">Bekor</button>
-      <button class="btn btn-danger" onclick="modalYop();(${callback.toString()})()">O'chirish</button>
+      <button class="btn btn-danger" onclick="modalYop();window._tasdiqlashCallback && window._tasdiqlashCallback()">O'chirish</button>
     </div>`;
   modalOch('Tasdiqlash', kontent);
 }

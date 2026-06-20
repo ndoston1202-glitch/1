@@ -35,7 +35,8 @@ def init_db():
         birlik TEXT NOT NULL DEFAULT 'dona',
         kelish_narxi REAL NOT NULL DEFAULT 0, sotish_narxi REAL NOT NULL DEFAULT 0,
         miqdor REAL NOT NULL DEFAULT 0, min_miqdor REAL DEFAULT 5,
-        tavsif TEXT, yaratilgan TEXT DEFAULT (datetime('now','localtime')),
+        tavsif TEXT, rasm TEXT,
+        yaratilgan TEXT DEFAULT (datetime('now','localtime')),
         yangilangan TEXT DEFAULT (datetime('now','localtime')), faol INTEGER DEFAULT 1,
         FOREIGN KEY (kategoriya_id) REFERENCES kategoriyalar(id)
     );
@@ -123,6 +124,11 @@ def init_db():
         for n, t in kats:
             c.execute("INSERT OR IGNORE INTO kategoriyalar (nomi,tavsif) VALUES (?,?)", (n,t))
     conn.commit()
+    # Mavjud bazaga rasm ustunini qo'shish (migration)
+    try:
+        conn.execute("ALTER TABLE mahsulotlar ADD COLUMN rasm TEXT")
+        conn.commit()
+    except: pass
     conn.close()
 
 
@@ -402,12 +408,11 @@ class Handler(BaseHTTPRequestHandler):
 
             if path == '/api/mahsulotlar':
                 try:
-                    # Duplikat tekshiruv — bir xil nomli mahsulot bo'lmasin
                     mavjud = conn.execute("SELECT id FROM mahsulotlar WHERE LOWER(nomi)=LOWER(?) AND faol=1", (body['nomi'],)).fetchone()
                     if mavjud: return self.send_error_json(f"'{body['nomi']}' nomli mahsulot allaqachon mavjud!")
-                    r = conn.execute("INSERT INTO mahsulotlar (nomi,kategoriya_id,shtrix_kod,birlik,kelish_narxi,sotish_narxi,miqdor,min_miqdor,tavsif) VALUES (?,?,?,?,?,?,?,?,?)",
+                    r = conn.execute("INSERT INTO mahsulotlar (nomi,kategoriya_id,shtrix_kod,birlik,kelish_narxi,sotish_narxi,miqdor,min_miqdor,tavsif,rasm) VALUES (?,?,?,?,?,?,?,?,?,?)",
                         (body['nomi'],body.get('kategoriya_id'),body.get('shtrix_kod'),body.get('birlik','dona'),
-                         body.get('kelish_narxi',0),body.get('sotish_narxi',0),body.get('miqdor',0),body.get('min_miqdor',5),body.get('tavsif',''))).lastrowid
+                         body.get('kelish_narxi',0),body.get('sotish_narxi',0),body.get('miqdor',0),body.get('min_miqdor',5),body.get('tavsif',''),body.get('rasm'))).lastrowid
                     conn.commit(); return self.send_json({'muvaffaqiyat':True,'id':r})
                 except Exception as e: return self.send_error_json(str(e))
 
@@ -556,8 +561,8 @@ class Handler(BaseHTTPRequestHandler):
 
             m = re.match(r'^/api/mahsulotlar/(\d+)$', path)
             if m:
-                conn.execute("UPDATE mahsulotlar SET nomi=?,kategoriya_id=?,shtrix_kod=?,birlik=?,kelish_narxi=?,sotish_narxi=?,miqdor=?,min_miqdor=?,tavsif=?,yangilangan=datetime('now','localtime') WHERE id=?",
-                    (body['nomi'],body.get('kategoriya_id'),body.get('shtrix_kod'),body.get('birlik','dona'),body.get('kelish_narxi',0),body.get('sotish_narxi',0),body.get('miqdor',0),body.get('min_miqdor',5),body.get('tavsif',''),m.group(1)))
+                conn.execute("UPDATE mahsulotlar SET nomi=?,kategoriya_id=?,shtrix_kod=?,birlik=?,kelish_narxi=?,sotish_narxi=?,miqdor=?,min_miqdor=?,tavsif=?,rasm=?,yangilangan=datetime('now','localtime') WHERE id=?",
+                    (body['nomi'],body.get('kategoriya_id'),body.get('shtrix_kod'),body.get('birlik','dona'),body.get('kelish_narxi',0),body.get('sotish_narxi',0),body.get('miqdor',0),body.get('min_miqdor',5),body.get('tavsif',''),body.get('rasm'),m.group(1)))
                 conn.commit(); return self.send_json({'muvaffaqiyat':True})
 
             self.send_error_json('Topilmadi', 404)

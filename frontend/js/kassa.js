@@ -254,11 +254,22 @@ function kassaMahsulotFilter() {
   _kassaJadvalKorinish ? kassaMahsulotJadvalKorsatish(f) : kassaMahsulotKorsatish(f);
 }
 
+function chekMahsulotlar_foydaliNarx(m) {
+  // chegirma_foiz yoki chegirma_sum hisobga oladi
+  const chegirmaFoiz = m.chegirma_foiz || 0;
+  const chegirmaSom = m.chegirma_som || 0;
+  let narx = m.asl_narx || m.narxi;
+  if (chegirmaFoiz > 0) narx = narx * (1 - chegirmaFoiz / 100);
+  else if (chegirmaSom > 0) narx = Math.max(0, narx - chegirmaSom);
+  return Math.round(narx);
+}
+
 function kassaMahsulotKorsatish(royxat) {
   const grid = document.getElementById('kassaMahsulotGrid');
   if (!royxat.length) { grid.innerHTML = '<div class="empty-state"><i class="fas fa-search"></i><p>Topilmadi</p></div>'; return; }
   grid.innerHTML = royxat.map(m => `
     <div class="mahsulot-karta ${m.miqdor<=0?'kam':''}" onclick="chekGaQosh(${m.id})">
+      ${m.rasm ? `<img src="${m.rasm}" style="width:100%;height:80px;object-fit:cover;border-radius:6px;margin-bottom:6px">` : ''}
       <h4>${m.nomi}</h4>
       <div class="narxi">${formatSum(m.sotish_narxi)}</div>
       <div class="miqdor">Mavjud: ${m.miqdor} ${m.birlik}</div>
@@ -291,7 +302,9 @@ function chekGaQosh(mahsulot_id) {
     if (mavjud.miqdor >= m.miqdor) { toast('Omborda yetarli emas!', 'warning'); return; }
     mavjud.miqdor += 1;
   } else {
-    chekMahsulotlar.push({mahsulot_id:m.id, nomi:m.nomi, narxi:m.sotish_narxi, miqdor:1, birlik:m.birlik, max:m.miqdor});
+    chekMahsulotlar.push({mahsulot_id:m.id, nomi:m.nomi, narxi:m.sotish_narxi,
+      asl_narx:m.sotish_narxi, miqdor:1, birlik:m.birlik, max:m.miqdor, rasm:m.rasm||null,
+      chegirma_foiz:0, chegirma_som:0});
   }
   chekKorsatish();
   kassaXotirasiniSaqla();
@@ -304,21 +317,79 @@ function chekKorsatish() {
     div.innerHTML = '<div class="empty-state" style="padding:30px"><i class="fas fa-shopping-cart"></i><p>Mahsulot tanlang</p></div>';
     chekHisoba(); return;
   }
-  div.innerHTML = chekMahsulotlar.map((m,i) => `
-    <div class="chek-item">
-      <div style="flex:1">
-        <div class="chek-item-nomi">${m.nomi}</div>
-        <div class="chek-item-narxi">${formatSum(m.narxi)} / ${m.birlik}</div>
+  div.innerHTML = chekMahsulotlar.map((m,i) => {
+    const chegirmaFoiz = m.chegirma_foiz || 0;
+    const chegirmaSom = m.chegirma_som || 0;
+    let chegirmaNarx = m.asl_narx || m.narxi;
+    if (chegirmaFoiz > 0) chegirmaNarx = chegirmaNarx * (1 - chegirmaFoiz/100);
+    else if (chegirmaSom > 0) chegirmaNarx = Math.max(0, chegirmaNarx - chegirmaSom);
+    chegirmaNarx = Math.round(chegirmaNarx);
+    const jami = chegirmaNarx * m.miqdor;
+    return `
+    <div class="chek-item" style="flex-direction:column;align-items:stretch;gap:6px">
+      <div style="display:flex;align-items:center;gap:8px">
+        ${m.rasm ? `<img src="${m.rasm}" style="width:32px;height:32px;object-fit:cover;border-radius:4px;flex-shrink:0">` : ''}
+        <div style="flex:1">
+          <div class="chek-item-nomi">${m.nomi}</div>
+          <div class="chek-item-narxi">
+            ${chegirmaFoiz>0||chegirmaSom>0
+              ? `<s style="color:#94a3b8">${formatSum(m.asl_narx||m.narxi)}</s>
+                 <b style="color:#10b981">${formatSum(chegirmaNarx)}</b>`
+              : formatSum(m.narxi)} / ${m.birlik}
+          </div>
+        </div>
+        <div class="chek-item-miqdor">
+          <button onclick="chekMiqdorOzgartir(${i},-1)">−</button>
+          <input type="number" value="${m.miqdor}" min="0.01" max="${m.max}" step="0.01"
+            onchange="chekMiqdorSet(${i},this.value)" style="width:50px">
+          <button onclick="chekMiqdorOzgartir(${i},1)">+</button>
+        </div>
+        <div class="chek-item-jami" style="min-width:80px;text-align:right">${formatSum(jami)}</div>
+        <button class="btn btn-danger btn-icon btn-sm" onclick="chekDanOchir(${i})"><i class="fas fa-times"></i></button>
       </div>
-      <div class="chek-item-miqdor">
-        <button onclick="chekMiqdorOzgartir(${i},-1)">−</button>
-        <input type="number" value="${m.miqdor}" min="0.01" max="${m.max}" step="0.01"
-          onchange="chekMiqdorSet(${i},this.value)" style="width:55px">
-        <button onclick="chekMiqdorOzgartir(${i},1)">+</button>
+      <!-- Alohida chegirma -->
+      <div style="display:flex;align-items:center;gap:6px;padding:4px 8px;background:#f8fafc;border-radius:6px;font-size:12px">
+        <span style="color:#64748b;min-width:60px">Chegirma:</span>
+        <input type="number" placeholder="%" min="0" max="100" value="${chegirmaFoiz||''}"
+          style="width:55px;border:1px solid #e2e8f0;border-radius:4px;padding:3px 6px;font-size:12px"
+          oninput="mahsulotCheqirmaFoizOzgartir(${i},this.value)"
+          title="Foizda chegirma">
+        <span style="color:#94a3b8">%</span>
+        <span style="color:#94a3b8;margin:0 2px">yoki</span>
+        <input type="number" placeholder="so'm" min="0" value="${chegirmaSom||''}"
+          style="width:80px;border:1px solid #e2e8f0;border-radius:4px;padding:3px 6px;font-size:12px"
+          oninput="mahsulotCheqirmaSomOzgartir(${i},this.value)"
+          title="So'mda chegirma">
+        <span style="color:#94a3b8">so'm</span>
+        ${chegirmaFoiz>0||chegirmaSom>0
+          ? `<span style="color:#10b981;margin-left:4px">-${chegirmaFoiz>0?chegirmaFoiz+'%':formatSum(chegirmaSom)}</span>`
+          : ''}
       </div>
-      <div class="chek-item-jami">${formatSum(m.narxi*m.miqdor)}</div>
-      <button class="btn btn-danger btn-icon btn-sm" onclick="chekDanOchir(${i})"><i class="fas fa-times"></i></button>
-    </div>`).join('');
+    </div>`}).join('');
+  chekHisoba();
+}
+
+function mahsulotCheqirmaFoizOzgartir(i, val) {
+  const foiz = parseFloat(val) || 0;
+  if (!chekMahsulotlar[i]) return;
+  chekMahsulotlar[i].chegirma_foiz = foiz;
+  chekMahsulotlar[i].chegirma_som = 0;
+  const aslNarx = chekMahsulotlar[i].asl_narx || chekMahsulotlar[i].narxi;
+  chekMahsulotlar[i].asl_narx = aslNarx;
+  chekMahsulotlar[i].narxi = foiz > 0 ? Math.round(aslNarx * (1 - foiz/100)) : aslNarx;
+  kassaXotirasiniSaqla();
+  chekHisoba();
+}
+
+function mahsulotCheqirmaSomOzgartir(i, val) {
+  const som = parseFloat(val) || 0;
+  if (!chekMahsulotlar[i]) return;
+  chekMahsulotlar[i].chegirma_som = som;
+  chekMahsulotlar[i].chegirma_foiz = 0;
+  const aslNarx = chekMahsulotlar[i].asl_narx || chekMahsulotlar[i].narxi;
+  chekMahsulotlar[i].asl_narx = aslNarx;
+  chekMahsulotlar[i].narxi = som > 0 ? Math.max(0, aslNarx - som) : aslNarx;
+  kassaXotirasiniSaqla();
   chekHisoba();
 }
 
@@ -392,10 +463,18 @@ function chekChidir(sotuv, snap) {
       <div class="chek-print-qator"><span>Mijoz:</span><span>${mijozNomi}</span></div>
       <div class="chek-print-qator"><span>Sana:</span><span>${new Date().toLocaleString('uz-UZ')}</span></div>
       <div class="chek-print-separator"></div>
-      ${snap.mahsulotlar.map(m => `
+      ${snap.mahsulotlar.map(m => {
+        const chegirmaFoiz = m.chegirma_foiz || 0;
+        const chegirmaSom = m.chegirma_som || 0;
+        const aslNarx = m.asl_narx || m.narxi;
+        const chegirmaMatn = chegirmaFoiz > 0 ? `-${chegirmaFoiz}%` : chegirmaSom > 0 ? `-${formatSum(chegirmaSom)}` : '';
+        return `
         <div class="chek-print-qator"><span>${m.nomi}</span></div>
-        <div class="chek-print-qator"><span>${m.miqdor} x ${formatSum(m.narxi)}</span><span>${formatSum(m.narxi*m.miqdor)}</span></div>
-      `).join('')}
+        <div class="chek-print-qator">
+          <span>${m.miqdor} x ${formatSum(m.narxi)}${chegirmaMatn ? ` (chegirma: ${chegirmaMatn})` : ''}</span>
+          <span>${formatSum(m.narxi*m.miqdor)}</span>
+        </div>`;
+      }).join('')}
       <div class="chek-print-separator"></div>
       ${snap.chegirma>0?`<div class="chek-print-qator"><span>Chegirma:</span><span>-${formatSum(snap.chegirma)}</span></div>`:''}
       <div class="chek-print-qator" style="font-weight:bold;font-size:14px">
