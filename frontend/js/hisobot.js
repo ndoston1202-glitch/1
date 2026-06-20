@@ -464,19 +464,95 @@ async function qaytarishlarYukla() {
         <b>${rows.length}</b> ta qaytarish | Jami: <b style="color:#ef4444">${formatSum(jami)}</b>
       </div>
       <div class="table-wrapper"><table>
-        <thead><tr><th>Raqam</th><th>Kassir</th><th>Mijoz</th><th>Sabab</th><th>Summa</th><th>Sana</th><th></th></tr></thead>
-        <tbody>${rows.map(r=>`
+        <thead>
           <tr>
-            <td><span class="badge badge-warning">${r.chek_raqam}</span></td>
+            <th>Raqam</th><th>Kassir</th><th>Mijoz</th>
+            <th>Sabab</th><th>Summa</th><th>Sana</th><th>Amallar</th>
+          </tr>
+        </thead>
+        <tbody>${rows.map(r=>`
+          <tr style="cursor:pointer" onmouseover="this.style.background='#fef2f2'" onmouseout="this.style.background=''">
+            <td><span class="badge badge-warning" style="cursor:pointer" onclick="qaytarishBatafsil(${r.id})">${r.chek_raqam}</span></td>
             <td>${r.kassir_ismi||'-'}</td>
             <td>${r.mijoz_ismi||'-'}</td>
-            <td style="font-size:12px">${r.sabab||'-'}</td>
+            <td style="font-size:12px;max-width:120px">${r.sabab||'-'}</td>
             <td><b style="color:#ef4444">${formatSum(r.jami_summa)}</b></td>
             <td style="font-size:12px;color:#64748b">${formatSana(r.sana)}</td>
-            <td>${joriyFoydalanuvchi.rol==='admin'?`<button class="btn btn-danger btn-sm btn-icon" onclick="qaytarishOchir(${r.id})"><i class="fas fa-trash"></i></button>`:''}</td>
+            <td style="display:flex;gap:4px">
+              <button class="btn btn-secondary btn-sm btn-icon" title="Batafsil ko'rish"
+                onclick="qaytarishBatafsil(${r.id})">
+                <i class="fas fa-eye"></i>
+              </button>
+              ${joriyFoydalanuvchi.rol==='admin'?`
+                <button class="btn btn-danger btn-sm btn-icon" title="O'chirish"
+                  onclick="qaytarishOchir(${r.id})">
+                  <i class="fas fa-trash"></i>
+                </button>`:''}
+            </td>
           </tr>`).join('')}
-        </tbody></table></div>` :
+        </tbody>
+      </table></div>` :
       '<div class="empty-state"><i class="fas fa-undo"></i><p>Bu davrda qaytarish yo\'q</p></div>';
+  } catch(e) { toast(e.message,'error'); }
+}
+
+// ===== QAYTARISH BATAFSIL =====
+async function qaytarishBatafsil(id) {
+  try {
+    const r = await apiGet('/qaytarishlar/' + id);
+    const tafsilotlar = r.tafsilotlar || [];
+    modalOch(`Qaytarish — ${r.chek_raqam}`, `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:14px;margin-bottom:16px;
+        background:#fff1f2;padding:12px;border-radius:8px;border:1px solid #fecaca">
+        <div><b>Raqam:</b> <span class="badge badge-warning">${r.chek_raqam}</span></div>
+        <div><b>Kassir:</b> ${r.kassir_ismi||'-'}</div>
+        <div><b>Sana:</b> ${formatSana(r.sana)}</div>
+        <div><b>Mijoz:</b> ${r.mijoz_ismi||'-'}</div>
+        ${r.sabab?`<div colspan="2"><b>Sabab:</b> ${r.sabab}</div>`:''}
+      </div>
+
+      <h4 style="margin-bottom:10px;font-size:14px;color:#475569">
+        <i class="fas fa-list"></i> Qaytarilgan mahsulotlar:
+      </h4>
+
+      ${tafsilotlar.length ? `
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Mahsulot</th>
+                <th>Miqdor</th>
+                <th>Narxi</th>
+                <th>Jami</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${tafsilotlar.map((t,i) => `
+                <tr>
+                  <td>${i+1}</td>
+                  <td><b>${t.mahsulot_nomi}</b></td>
+                  <td>${t.miqdor} ${t.birlik}</td>
+                  <td>${formatSum(t.narxi)}</td>
+                  <td><b style="color:#ef4444">${formatSum(t.jami)}</b></td>
+                </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+        <div style="border-top:1px solid #e2e8f0;margin-top:12px;padding-top:12px;
+          display:flex;justify-content:space-between;font-size:16px;font-weight:700">
+          <span>Jami qaytarish:</span>
+          <span style="color:#ef4444">-${formatSum(r.jami_summa)}</span>
+        </div>` :
+        '<div class="empty-state"><i class="fas fa-box-open"></i><p>Tafsilot topilmadi</p></div>'}
+
+      <div class="modal-footer" style="padding:0;margin-top:16px">
+        <button class="btn btn-secondary" onclick="modalYop()">Yopish</button>
+        ${joriyFoydalanuvchi.rol==='admin' ? `
+          <button class="btn btn-danger" onclick="modalYop();qaytarishOchir(${r.id})">
+            <i class="fas fa-trash"></i> O'chirish
+          </button>` : ''}
+      </div>`);
   } catch(e) { toast(e.message,'error'); }
 }
 
