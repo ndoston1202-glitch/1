@@ -224,7 +224,6 @@ function mahsulotFormKontent(m = null) {
       </div>
     </form>`;
 }
-}
 
 async function mahsulotSaqlash(e, id) {
   e.preventDefault();
