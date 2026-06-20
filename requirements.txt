@@ -1,4 +1,2 @@
-# Railway uchun kerakli paketlar
-# Python standart kutubxonalar ishlatilgan (o'rnatish shart emas)
-# SQLite - built-in
-# http.server - built-in
+# Python standart kutubxonalar ishlatilgan
+# Qo'shimcha paket kerak emas

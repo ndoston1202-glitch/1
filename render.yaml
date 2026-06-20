@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: qurilish-dokoni
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python server.py
+    disk:
+      name: dokoni-db
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: RAILWAY_VOLUME_MOUNT_PATH
+        value: /data
+      - key: PORT
+        value: 10000
