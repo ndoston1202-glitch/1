@@ -1,5 +1,8 @@
 __pycache__/
 *.pyc
-dokoni.db
-dokoni.db-shm
-dokoni.db-wal
+*.pyo
+*.db
+*.db-shm
+*.db-wal
+.env
+node_modules/

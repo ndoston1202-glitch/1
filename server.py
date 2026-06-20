@@ -4,8 +4,8 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 from datetime import datetime
 
-DB_PATH = os.path.join(os.path.dirname(__file__), 'dokoni.db')
-FRONTEND = os.path.join(os.path.dirname(__file__), 'frontend')
+DB_PATH = os.environ.get('DB_PATH', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'dokoni.db'))
+FRONTEND = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'frontend')
 
 def get_db():
     conn = sqlite3.connect(DB_PATH)
@@ -858,7 +858,8 @@ class Handler(BaseHTTPRequestHandler):
 if __name__ == '__main__':
     init_db()
     PORT = int(os.environ.get('PORT', 3000))
-    server = HTTPServer(('0.0.0.0', PORT), Handler)
-    print(f"✅ Server ishga tushdi: http://localhost:{PORT}")
+    print(f"✅ Server ishga tushdi: http://0.0.0.0:{PORT}")
     print(f"👤 Admin: username=admin, parol=admin123")
+    print(f"📦 DB: {DB_PATH}")
+    server = HTTPServer(('0.0.0.0', PORT), Handler)
     server.serve_forever()
