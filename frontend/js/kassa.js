@@ -95,12 +95,24 @@ async function kassaYukla() {
               oninput="chekHisoba();kassaXotirasiniSaqla()">
           </div>
           <div class="chek-jami-qator katta"><span>To'lash:</span><span id="chekYakuniy">0 so'm</span></div>
-          <div class="form-group" style="margin:10px 0 8px">
-            <label style="font-size:13px">To'lov turi</label>
-            <select id="tolovTuri" class="filter-select" style="width:100%" onchange="kassaXotirasiniSaqla()">
-              ${tolovUsullariOptions(soz)}
-            </select>
+
+          <!-- ARALASH TO'LOV TIZIMI -->
+          <div style="margin:10px 0 8px;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden">
+            <div style="background:#f8fafc;padding:8px 12px;display:flex;justify-content:space-between;align-items:center">
+              <span style="font-size:13px;font-weight:600;color:#475569"><i class="fas fa-credit-card"></i> To'lov</span>
+              <button class="btn btn-secondary btn-sm" onclick="tolovQatorQosh()" style="font-size:11px;padding:3px 8px">
+                <i class="fas fa-plus"></i> Tur qo'sh
+              </button>
+            </div>
+            <div id="tolovQatorlar" style="padding:8px">
+              <!-- Qatorlar bu yerda -->
+            </div>
+            <div style="padding:6px 12px;background:#f0fdf4;display:flex;justify-content:space-between;font-size:13px">
+              <span style="color:#64748b">Qolgan:</span>
+              <span id="tolovQolgan" style="font-weight:700;color:#ef4444">0 so'm</span>
+            </div>
           </div>
+
           <button class="btn btn-success" style="width:100%;padding:12px;font-size:15px" onclick="sotuvYakunla()">
             <i class="fas fa-check-circle"></i> Sotishni tasdiqlash
           </button>
@@ -138,17 +150,112 @@ async function kassaYukla() {
       tanlangan_mijoz = null;
     }
     kassaMahsulotKorsatish(kassaMahsulotlar);
+    tolovQatorlarniBoshlash();
   } catch(e) { toast(e.message, 'error'); }
 }
 
 
-function tolovUsullariOptions(soz) {
+// ===== ARALASH TO'LOV TIZIMI =====
+let tolovQatorlarData = [];
+
+function tolovQatorlarniBoshlash() {
+  const soz = sozlamalarniOl();
+  // Bitta standart qator bilan boshlash
+  tolovQatorlarData = [{ tur: soz.savdoTolovDefault || 'naqd', summa: 0 }];
+  tolovQatorlarKorsatish();
+}
+
+function tolovQatorKorsatishOptions(tanlangan) {
+  const soz = sozlamalarniOl();
   let opts = '';
-  if (soz.tolovNaqd !== false) opts += `<option value="naqd">${soz.tolovNaqdNomi||'💵 Naqd pul'}</option>`;
-  if (soz.tolovKarta !== false) opts += `<option value="karta">${soz.tolovKartaNomi||'💳 Plastik karta'}</option>`;
-  if (soz.tolovQarz !== false) opts += `<option value="qarz">${soz.tolovQarzNomi||'📋 Qarz'}</option>`;
-  if (soz.tolovBankTransfer) opts += `<option value="bank">${soz.tolovBankNomi||'🏦 Bank'}</option>`;
-  return opts || '<option value="naqd">💵 Naqd pul</option>';
+  if (soz.tolovNaqd !== false) opts += `<option value="naqd" ${tanlangan==='naqd'?'selected':''}>💵 Naqd</option>`;
+  if (soz.tolovKarta !== false) opts += `<option value="karta" ${tanlangan==='karta'?'selected':''}>💳 Karta</option>`;
+  if (soz.tolovQarz !== false) opts += `<option value="qarz" ${tanlangan==='qarz'?'selected':''}>📋 Qarz</option>`;
+  if (soz.tolovBankTransfer) opts += `<option value="bank" ${tanlangan==='bank'?'selected':''}>🏦 Bank</option>`;
+  return opts || `<option value="naqd" ${tanlangan==='naqd'?'selected':''}>💵 Naqd</option>`;
+}
+
+function tolovQatorlarKorsatish() {
+  const div = document.getElementById('tolovQatorlar');
+  if (!div) return;
+
+  div.innerHTML = tolovQatorlarData.map((q, i) => `
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+      <select onchange="tolovTurOzgartir(${i},this.value)"
+        style="flex:1;border:1px solid #e2e8f0;border-radius:6px;padding:5px 8px;font-size:13px;background:white">
+        ${tolovQatorKorsatishOptions(q.tur)}
+      </select>
+      <input type="number" min="0" placeholder="Summa"
+        value="${q.summa || ''}"
+        oninput="tolovSummaOzgartir(${i},this.value)"
+        style="width:110px;border:1px solid #e2e8f0;border-radius:6px;padding:5px 8px;font-size:13px">
+      <button onclick="tolovQatorToldir(${i})" title="Qolganini to'ldirish"
+        style="border:none;background:#dbeafe;color:#2563eb;border-radius:6px;padding:5px 8px;cursor:pointer;font-size:12px;white-space:nowrap">
+        ↓ Qolgan
+      </button>
+      ${tolovQatorlarData.length > 1 ? `
+        <button onclick="tolovQatorOchir(${i})"
+          style="border:none;background:#fee2e2;color:#ef4444;border-radius:6px;padding:5px 8px;cursor:pointer">
+          <i class="fas fa-times"></i>
+        </button>` : ''}
+    </div>`).join('');
+
+  tolovQolganniHisoba();
+}
+
+function tolovTurOzgartir(i, tur) {
+  tolovQatorlarData[i].tur = tur;
+  // Qarz tanlanganda mijoz tekshiruvi (real-time ogohlantirish)
+  if (tur === 'qarz' && !tanlangan_mijoz) {
+    toast('⚠️ Qarzga sotish uchun avval mijoz tanlang!', 'warning');
+  }
+  kassaXotirasiniSaqla();
+  tolovQolganniHisoba();
+}
+
+function tolovSummaOzgartir(i, val) {
+  tolovQatorlarData[i].summa = parseFloat(val) || 0;
+  kassaXotirasiniSaqla();
+  tolovQolganniHisoba();
+}
+
+function tolovQatorToldir(i) {
+  // Qolgan summani shu qatorga to'ldirish
+  const yakuniy = parseFloat(document.getElementById('chekYakuniy')?.textContent?.replace(/[^\d]/g,'')) || 0;
+  const boshqalar = tolovQatorlarData.reduce((s, q, idx) => idx !== i ? s + (q.summa || 0) : s, 0);
+  const qolgan = Math.max(0, yakuniy - boshqalar);
+  tolovQatorlarData[i].summa = qolgan;
+  kassaXotirasiniSaqla();
+  tolovQatorlarKorsatish();
+}
+
+function tolovQatorQosh() {
+  tolovQatorlarData.push({ tur: 'naqd', summa: 0 });
+  tolovQatorlarKorsatish();
+}
+
+function tolovQatorOchir(i) {
+  tolovQatorlarData.splice(i, 1);
+  tolovQatorlarKorsatish();
+}
+
+function tolovQolganniHisoba() {
+  const yakuniyEl = document.getElementById('chekYakuniy');
+  if (!yakuniyEl) return;
+  const yakuniy = chekMahsulotlar.reduce((s,m) => s + m.narxi*m.miqdor, 0)
+    - (parseFloat(document.getElementById('chegirmaInput')?.value) || 0);
+  const tolovJami = tolovQatorlarData.reduce((s, q) => s + (q.summa || 0), 0);
+  const qolgan = Math.max(0, yakuniy - tolovJami);
+  const qolganEl = document.getElementById('tolovQolgan');
+  if (qolganEl) {
+    qolganEl.textContent = formatSum(qolgan);
+    qolganEl.style.color = qolgan === 0 ? '#10b981' : '#ef4444';
+  }
+}
+
+function tolovQatorlarniYangilash() {
+  // chekHisoba chaqirilganda to'lov qolganini ham yangilash
+  tolovQolganniHisoba();
 }
 
 let _kassaJadvalKorinish = false;
@@ -472,6 +579,7 @@ function chekTozala() {
   const tb=document.getElementById('tanlangan_mijoz_blok');
   if(tb) tb.innerHTML='<span style="color:#94a3b8;font-size:13px">— Mijozsiz sotuv —</span>';
   kassaXotirasiniTozala();
+  tolovQatorlarniBoshlash();
 }
 
 function chekHisoba() {
@@ -480,29 +588,63 @@ function chekHisoba() {
   const yakuniy=Math.max(0,jami-chegirma);
   const jEl=document.getElementById('chekJami'); if(jEl) jEl.textContent=formatSum(jami);
   const yEl=document.getElementById('chekYakuniy'); if(yEl) yEl.textContent=formatSum(yakuniy);
+  tolovQolganniHisoba();
 }
 
 
 async function sotuvYakunla() {
   if (!chekMahsulotlar.length) { toast('Chek bo\'sh!', 'warning'); return; }
+
+  // QARZ TEKSHIRUVI — mijoz majburiy
+  const qarzBor = tolovQatorlarData.some(q => q.tur === 'qarz');
+  if (qarzBor && !tanlangan_mijoz) {
+    toast('⚠️ Qarzga sotish uchun avval mijoz tanlang!', 'warning');
+    // Mijoz tanlash oynasini ochish
+    setTimeout(() => mijozTanlash(), 300);
+    return;
+  }
+
   const chegirma = parseFloat(document.getElementById('chegirmaInput').value) || 0;
-  const tolov_turi = document.getElementById('tolovTuri').value;
+  const jami = chekMahsulotlar.reduce((s,m) => s + m.narxi*m.miqdor, 0);
+  const yakuniy = Math.max(0, jami - chegirma);
+
+  // To'lov turlarini tayyorlash
+  const tolovlar = tolovQatorlarData.filter(q => q.summa > 0);
+  if (!tolovlar.length) {
+    // Bitta ham summa kiritilmagan — yakuniy summani birinchi turga qo'yamiz
+    tolovQatorlarData[0].summa = yakuniy;
+    tolovQatorlarKorsatish();
+  }
+
+  // Asosiy to'lov turi (eng katta summali)
+  const asosiyTolov = tolovQatorlarData.reduce((max, q) => q.summa > max.summa ? q : max, tolovQatorlarData[0]);
+  const tolov_turi = asosiyTolov.tur;
+
   const data = {
     kassir_id: joriyFoydalanuvchi.id,
     mahsulotlar: chekMahsulotlar.map(m => ({mahsulot_id:m.mahsulot_id, miqdor:m.miqdor, narxi:m.narxi})),
-    chegirma, tolov_turi,
+    chegirma,
+    tolov_turi,
+    tolov_tafsilotlari: tolovQatorlarData.filter(q => q.summa > 0),
     mijoz_id: tanlangan_mijoz ? tanlangan_mijoz.id : null,
     mijoz_ismi: tanlangan_mijoz ? tanlangan_mijoz.toliqIsm : ''
   };
+
   try {
     const r = await apiPost('/sotuvlar', data);
     toast(`✅ Sotuv: ${r.chek_raqam}`, 'success');
     const soz = sozlamalarniOl();
-    const snap = { mahsulotlar:[...chekMahsulotlar], mijoz: tanlangan_mijoz, chegirma };
+    const snap = {
+      mahsulotlar:[...chekMahsulotlar],
+      mijoz: tanlangan_mijoz,
+      chegirma,
+      tolovlar: [...tolovQatorlarData]
+    };
     kassaXotirasiniTozala();
     chekTozala();
     kassaMahsulotlar = await apiGet('/mahsulotlar');
     kassaMahsulotKorsatish(kassaMahsulotlar);
+    tolovQatorlarniBoshlash();
     if (soz.avtomatChek !== false) chekChidir(r, snap);
   } catch(e) { toast(e.message, 'error'); }
 }
@@ -510,6 +652,12 @@ async function sotuvYakunla() {
 function chekChidir(sotuv, snap) {
   const soz = sozlamalarniOl();
   const mijozNomi = snap.mijoz ? snap.mijoz.toliqIsm : 'Mijozsiz';
+  const tolovlar = snap.tolovlar || [{tur: sotuv.tolov_turi, summa: sotuv.jami_summa}];
+  const tolovHtml = tolovlar.filter(t => t.summa > 0).map(t => `
+    <div class="chek-print-qator">
+      <span>${t.tur==='naqd'?'💵 Naqd':t.tur==='karta'?'💳 Karta':t.tur==='qarz'?'📋 Qarz':'🏦 Bank'}:</span>
+      <span>${formatSum(t.summa)}</span>
+    </div>`).join('');
   const kontent = `
     <div class="chek-print-box" id="chekPrint">
       <h3 style="text-align:center">🏗️ ${soz.chek_dokoni_nomi||"Qurilish Do'koni"}</h3>
@@ -524,20 +672,21 @@ function chekChidir(sotuv, snap) {
       ${snap.mahsulotlar.map(m => {
         const chegirmaFoiz = m.chegirma_foiz || 0;
         const chegirmaSom = m.chegirma_som || 0;
-        const aslNarx = m.asl_narx || m.narxi;
-        const chegirmaMatn = chegirmaFoiz > 0 ? `-${chegirmaFoiz}%` : chegirmaSom > 0 ? `-${formatSum(chegirmaSom)}` : '';
+        const chegirmaMatn = chegirmaFoiz > 0 ? ` (-${chegirmaFoiz}%)` : chegirmaSom > 0 ? ` (-${formatSum(chegirmaSom)})` : '';
         return `
         <div class="chek-print-qator"><span>${m.nomi}</span></div>
         <div class="chek-print-qator">
-          <span>${m.miqdor} x ${formatSum(m.narxi)}${chegirmaMatn ? ` (chegirma: ${chegirmaMatn})` : ''}</span>
+          <span>${m.miqdor} x ${formatSum(m.narxi)}${chegirmaMatn}</span>
           <span>${formatSum(m.narxi*m.miqdor)}</span>
         </div>`;
       }).join('')}
       <div class="chek-print-separator"></div>
-      ${snap.chegirma>0?`<div class="chek-print-qator"><span>Chegirma:</span><span>-${formatSum(snap.chegirma)}</span></div>`:''}
+      ${snap.chegirma>0?`<div class="chek-print-qator"><span>Umumiy chegirma:</span><span>-${formatSum(snap.chegirma)}</span></div>`:''}
       <div class="chek-print-qator" style="font-weight:bold;font-size:14px">
         <span>JAMI:</span><span>${formatSum(sotuv.jami_summa)}</span>
       </div>
+      <div class="chek-print-separator"></div>
+      ${tolovHtml}
       <div class="chek-print-separator"></div>
       <div style="text-align:center;margin-top:8px">${soz.chek_xabar||"Rahmat! Yana keling! 🙏"}</div>
     </div>
