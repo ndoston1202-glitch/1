@@ -186,11 +186,14 @@ async function mijozTanlash() {
   const mijozlar = await apiGet('/mijozlar');
   window._kassaMijozlar = mijozlar;
   modalOch('Mijoz tanlash', `
-    <div style="margin-bottom:12px">
+    <div style="display:flex;gap:8px;margin-bottom:12px">
       <input type="text" id="mijozQidiruv" class="search-input" placeholder="🔍 Mijoz qidirish..."
-        oninput="mijozlarFilter()" style="width:100%">
+        oninput="mijozlarFilter()" style="flex:1">
+      <button class="btn btn-primary btn-sm" onclick="kassadanMijozQosh()" title="Yangi mijoz qo'shish">
+        <i class="fas fa-user-plus"></i> Yangi
+      </button>
     </div>
-    <div id="mijozlarRoyxat" style="max-height:350px;overflow-y:auto">${mijozlarHtml(mijozlar)}</div>
+    <div id="mijozlarRoyxat" style="max-height:320px;overflow-y:auto">${mijozlarHtml(mijozlar)}</div>
     <div style="margin-top:12px;padding-top:12px;border-top:1px solid #e2e8f0">
       <button class="btn btn-secondary" style="width:100%" onclick="mijozniBekor()">
         <i class="fas fa-times"></i> Mijozsiz davom etish
@@ -226,6 +229,61 @@ function mijozlarFilter() {
   const f = (window._kassaMijozlar||[]).filter(m =>
     (m.ism+' '+(m.familiya||'')).toLowerCase().includes(q) || (m.telefon||'').includes(q));
   document.getElementById('mijozlarRoyxat').innerHTML = mijozlarHtml(f);
+}
+
+// Kassadan tezda yangi mijoz qo'shish
+function kassadanMijozQosh() {
+  const qidiruv = document.getElementById('mijozQidiruv')?.value || '';
+  const kontent = `
+    <form onsubmit="kassadanMijozSaqla(event)">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Ismi *</label>
+          <input type="text" name="ism" required value="${qidiruv}" placeholder="Ismi" autofocus>
+        </div>
+        <div class="form-group">
+          <label>Familiyasi</label>
+          <input type="text" name="familiya" placeholder="Familiyasi">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Telefon</label>
+          <input type="text" name="telefon" placeholder="+998 90 123 45 67">
+        </div>
+        <div class="form-group">
+          <label>Manzil</label>
+          <input type="text" name="manzil" placeholder="Shahar, ko'cha">
+        </div>
+      </div>
+      <div class="modal-footer" style="padding:0;margin-top:10px">
+        <button type="button" class="btn btn-secondary" onclick="mijozTanlash()">
+          <i class="fas fa-arrow-left"></i> Orqaga
+        </button>
+        <button type="submit" class="btn btn-primary">
+          <i class="fas fa-user-plus"></i> Qo'shish va tanlash
+        </button>
+      </div>
+    </form>`;
+  modalOch('Yangi mijoz qo\'shish', kontent);
+}
+
+async function kassadanMijozSaqla(e) {
+  e.preventDefault();
+  const form = e.target;
+  const data = {
+    ism: form.ism.value.trim(),
+    familiya: form.familiya.value.trim(),
+    telefon: form.telefon.value.trim(),
+    manzil: form.manzil.value.trim(),
+  };
+  try {
+    const r = await apiPost('/mijozlar', data);
+    toast('✅ Mijoz qo\'shildi!', 'success');
+    // Yangi qo'shilgan mijozni avtomatik tanlash
+    const toliqIsm = (data.ism + ' ' + data.familiya).trim();
+    mijozniTanla(r.id, toliqIsm, data.telefon, data.familiya, data.ism);
+  } catch (e) { toast(e.message, 'error'); }
 }
 
 function mijozniTanla(id, toliqIsm, telefon, familiya, ism) {
