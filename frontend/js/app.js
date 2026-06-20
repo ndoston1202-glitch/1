@@ -37,6 +37,7 @@ function ilovaYukla() {
   };
   sanani(); setInterval(sanani, 60000);
 
+  sozlamalarniQolla();
   sahifaOch('dashboard');
 }
 
@@ -49,7 +50,8 @@ function sahifaOch(nomi) {
 
   const nomlar = {
     dashboard: 'Dashboard', kassa: 'Kassa / Sotuv', mahsulotlar: 'Mahsulotlar',
-    ombor: 'Ombor', hisobot: 'Hisobotlar', xodimlar: 'Xodimlar', mijozlar: 'Mijozlar'
+    ombor: 'Ombor', hisobot: 'Hisobotlar', xodimlar: 'Xodimlar',
+    mijozlar: 'Mijozlar', sozlamalar: '⚙️ Sozlamalar'
   };
   document.getElementById('sahifaNomi').textContent = nomlar[nomi] || nomi;
 
@@ -68,6 +70,7 @@ function sahifaOch(nomi) {
     case 'hisobot': hisobotYukla(); break;
     case 'xodimlar': xodimlarYukla(); break;
     case 'mijozlar': mijozlarYukla(); break;
+    case 'sozlamalar': sozlamalarYukla(); break;
   }
 }
 

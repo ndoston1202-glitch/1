@@ -71,14 +71,32 @@ def init_db():
     );
     CREATE TABLE IF NOT EXISTS mijozlar (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        ism TEXT NOT NULL,
-        familiya TEXT,
-        telefon TEXT,
-        manzil TEXT,
-        izoh TEXT,
+        ism TEXT NOT NULL, familiya TEXT,
+        telefon TEXT, manzil TEXT, izoh TEXT,
         qarz REAL DEFAULT 0,
-        yaratilgan TEXT DEFAULT (datetime('now','localtime')),
-        faol INTEGER DEFAULT 1
+        yaratilgan TEXT DEFAULT (datetime('now','localtime')), faol INTEGER DEFAULT 1
+    );
+    CREATE TABLE IF NOT EXISTS qaytarishlar (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        sotuv_id INTEGER,
+        chek_raqam TEXT,
+        kassir_id INTEGER NOT NULL,
+        mijoz_id INTEGER,
+        mijoz_ismi TEXT,
+        sabab TEXT,
+        jami_summa REAL DEFAULT 0,
+        sana TEXT DEFAULT (datetime('now','localtime')),
+        FOREIGN KEY (kassir_id) REFERENCES foydalanuvchilar(id)
+    );
+    CREATE TABLE IF NOT EXISTS qaytarish_tafsilotlari (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        qaytarish_id INTEGER NOT NULL,
+        mahsulot_id INTEGER NOT NULL,
+        miqdor REAL NOT NULL,
+        narxi REAL NOT NULL,
+        jami REAL NOT NULL,
+        FOREIGN KEY (qaytarish_id) REFERENCES qaytarishlar(id),
+        FOREIGN KEY (mahsulot_id) REFERENCES mahsulotlar(id)
     );
     """)
     conn.commit()
@@ -280,6 +298,59 @@ class Handler(BaseHTTPRequestHandler):
                 xarajatlar = row_to_dict(conn.execute("SELECT COALESCE(SUM(summa),0) as jami FROM xarajatlar WHERE strftime('%Y-%m',sana)=?", (ym,)).fetchone())
                 return self.send_json({'yil':y,'oy':o,'kunliklar':kunliklar,'jami':jami,'xarajatlar':xarajatlar})
 
+            # QAYTARISHLAR
+            if path == '/api/qaytarishlar':
+                sql = """SELECT q.*,f.ism||' '||f.familiya as kassir_ismi,
+                    mj.ism||' '||COALESCE(mj.familiya,'') as mijoz_ismi
+                    FROM qaytarishlar q
+                    LEFT JOIN foydalanuvchilar f ON q.kassir_id=f.id
+                    LEFT JOIN mijozlar mj ON q.mijoz_id=mj.id WHERE 1=1"""
+                params=[]
+                if qp('boshlanish'): sql+=" AND date(q.sana)>=?"; params.append(qp('boshlanish'))
+                if qp('tugash'): sql+=" AND date(q.sana)<=?"; params.append(qp('tugash'))
+                sql+=" ORDER BY q.sana DESC"
+                return self.send_json(rows_to_list(conn.execute(sql,params).fetchall()))
+
+            m = re.match(r'^/api/qaytarishlar/(\d+)$', path)
+            if m:
+                row = conn.execute("SELECT * FROM qaytarishlar WHERE id=?", (m.group(1),)).fetchone()
+                if not row: return self.send_error_json('Topilmadi',404)
+                taf = rows_to_list(conn.execute("SELECT qt.*,mah.nomi as mahsulot_nomi,mah.birlik FROM qaytarish_tafsilotlari qt JOIN mahsulotlar mah ON qt.mahsulot_id=mah.id WHERE qt.qaytarish_id=?", (m.group(1),)).fetchall())
+                d=row_to_dict(row); d['tafsilotlar']=taf
+                return self.send_json(d)
+
+            # HISOBOT - FOYDA
+            if path == '/api/hisobot/foyda':
+                bosh = qp('boshlanish') or datetime.now().strftime('%Y-%m-%d')
+                tug  = qp('tugash')    or datetime.now().strftime('%Y-%m-%d')
+                rows = rows_to_list(conn.execute("""
+                    SELECT mah.nomi, mah.birlik, mah.kelish_narxi,
+                        SUM(st.miqdor) as jami_miqdor,
+                        SUM(st.jami) as jami_sotish,
+                        SUM(st.miqdor * mah.kelish_narxi) as jami_kelish,
+                        SUM(st.jami) - SUM(st.miqdor * mah.kelish_narxi) as foyda
+                    FROM sotuv_tafsilotlari st
+                    JOIN mahsulotlar mah ON st.mahsulot_id=mah.id
+                    JOIN sotuvlar s ON st.sotuv_id=s.id
+                    WHERE date(s.sana)>=? AND date(s.sana)<=?
+                    GROUP BY mah.id ORDER BY foyda DESC
+                """, (bosh, tug)).fetchall())
+                jami_foyda = sum(r['foyda'] or 0 for r in rows)
+                return self.send_json({'rows': rows, 'jami_foyda': jami_foyda, 'boshlanish': bosh, 'tugash': tug})
+
+            # HISOBOT - QOLDIQ
+            if path == '/api/hisobot/qoldiq':
+                rows = rows_to_list(conn.execute("""
+                    SELECT m.id, m.nomi, m.birlik, m.kelish_narxi, m.sotish_narxi,
+                        m.miqdor, m.min_miqdor, k.nomi as kategoriya_nomi,
+                        m.miqdor * m.kelish_narxi as kelish_qiymati,
+                        m.miqdor * m.sotish_narxi as sotish_qiymati
+                    FROM mahsulotlar m
+                    LEFT JOIN kategoriyalar k ON m.kategoriya_id=k.id
+                    WHERE m.faol=1 ORDER BY m.nomi
+                """).fetchall())
+                return self.send_json(rows)
+
             if path == '/api/hisobot/umumiy':
                 bugun = datetime.now().strftime('%Y-%m-%d')
                 oy = datetime.now().strftime('%Y-%m')
@@ -382,6 +453,23 @@ class Handler(BaseHTTPRequestHandler):
                 conn.execute("INSERT INTO xarajatlar (nomi,summa,kategoriya,foydalanuvchi_id,izoh) VALUES (?,?,?,?,?)",
                     (body['nomi'],body['summa'],body.get('kategoriya',''),body.get('foydalanuvchi_id'),body.get('izoh','')))
                 conn.commit(); return self.send_json({'muvaffaqiyat':True})
+
+            # QAYTARISH
+            if path == '/api/qaytarishlar':
+                mahsulotlar = body.get('mahsulotlar', [])
+                if not mahsulotlar: return self.send_error_json('Mahsulot tanlanmagan!')
+                jami = sum(m['miqdor']*m['narxi'] for m in mahsulotlar)
+                chek = 'QTR' + str(int(datetime.now().timestamp()*1000))
+                r = conn.execute(
+                    "INSERT INTO qaytarishlar (sotuv_id,chek_raqam,kassir_id,mijoz_id,mijoz_ismi,sabab,jami_summa) VALUES (?,?,?,?,?,?,?)",
+                    (body.get('sotuv_id'), chek, body['kassir_id'], body.get('mijoz_id'),
+                     body.get('mijoz_ismi',''), body.get('sabab',''), jami)).lastrowid
+                for m in mahsulotlar:
+                    conn.execute("INSERT INTO qaytarish_tafsilotlari (qaytarish_id,mahsulot_id,miqdor,narxi,jami) VALUES (?,?,?,?,?)",
+                        (r, m['mahsulot_id'], m['miqdor'], m['narxi'], m['miqdor']*m['narxi']))
+                    conn.execute("UPDATE mahsulotlar SET miqdor=miqdor+? WHERE id=?", (m['miqdor'], m['mahsulot_id']))
+                conn.commit()
+                return self.send_json({'muvaffaqiyat':True, 'id':r, 'chek_raqam':chek, 'jami_summa':jami})
 
             # EXCEL (CSV) IMPORT
             if path == '/api/import/mahsulotlar':
@@ -514,6 +602,15 @@ class Handler(BaseHTTPRequestHandler):
                     conn.execute("UPDATE mahsulotlar SET miqdor=miqdor+? WHERE id=?", (t['miqdor'],t['mahsulot_id']))
                 conn.execute("DELETE FROM sotuv_tafsilotlari WHERE sotuv_id=?", (sid,))
                 conn.execute("DELETE FROM sotuvlar WHERE id=?", (sid,))
+                conn.commit(); return self.send_json({'muvaffaqiyat':True})
+
+            m = re.match(r'^/api/qaytarishlar/(\d+)$', path)
+            if m:
+                taf = conn.execute("SELECT * FROM qaytarish_tafsilotlari WHERE qaytarish_id=?", (m.group(1),)).fetchall()
+                for t in taf:
+                    conn.execute("UPDATE mahsulotlar SET miqdor=miqdor-? WHERE id=?", (t['miqdor'],t['mahsulot_id']))
+                conn.execute("DELETE FROM qaytarish_tafsilotlari WHERE qaytarish_id=?", (m.group(1),))
+                conn.execute("DELETE FROM qaytarishlar WHERE id=?", (m.group(1),))
                 conn.commit(); return self.send_json({'muvaffaqiyat':True})
 
             m = re.match(r'^/api/xarajatlar/(\d+)$', path)
