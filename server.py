@@ -357,6 +357,83 @@ class Handler(BaseHTTPRequestHandler):
                 """).fetchall())
                 return self.send_json(rows)
 
+            # JURNAL — barcha operatsiyalar
+            if path == '/api/jurnal':
+                bosh = qp('boshlanish') or datetime.now().strftime('%Y-%m-%d')
+                tug  = qp('tugash')    or datetime.now().strftime('%Y-%m-%d')
+                tur  = qp('tur') or 'barchasi'
+                limit = int(qp('limit') or 200)
+
+                operatsiyalar = []
+
+                # SOTUVLAR
+                if tur in ('barchasi','sotuv'):
+                    rows = conn.execute("""
+                        SELECT s.id, 'sotuv' as tur, s.chek_raqam as raqam,
+                            s.jami_summa as summa, s.tolov_turi,
+                            s.mijoz_ismi, s.sana,
+                            f.ism||' '||f.familiya as xodim,
+                            (SELECT COUNT(*) FROM sotuv_tafsilotlari WHERE sotuv_id=s.id) as mahsulotlar_soni
+                        FROM sotuvlar s
+                        LEFT JOIN foydalanuvchilar f ON s.kassir_id=f.id
+                        WHERE date(s.sana)>=? AND date(s.sana)<=?
+                    """, (bosh, tug)).fetchall()
+                    operatsiyalar += [dict(r) for r in rows]
+
+                # QAYTARISHLAR
+                if tur in ('barchasi','qaytarish'):
+                    rows = conn.execute("""
+                        SELECT q.id, 'qaytarish' as tur, q.chek_raqam as raqam,
+                            q.jami_summa as summa, '' as tolov_turi,
+                            q.mijoz_ismi, q.sana, q.sabab,
+                            f.ism||' '||f.familiya as xodim,
+                            (SELECT COUNT(*) FROM qaytarish_tafsilotlari WHERE qaytarish_id=q.id) as mahsulotlar_soni
+                        FROM qaytarishlar q
+                        LEFT JOIN foydalanuvchilar f ON q.kassir_id=f.id
+                        WHERE date(q.sana)>=? AND date(q.sana)<=?
+                    """, (bosh, tug)).fetchall()
+                    operatsiyalar += [dict(r) for r in rows]
+
+                # OMBOR KIRIM
+                if tur in ('barchasi','kirim'):
+                    rows = conn.execute("""
+                        SELECT o.id, 'kirim' as tur,
+                            'KRM'||o.id as raqam,
+                            o.miqdor * o.kelish_narxi as summa,
+                            '' as tolov_turi, '' as mijoz_ismi,
+                            o.sana, o.yetkazuvchi as sabab,
+                            f.ism||' '||f.familiya as xodim,
+                            1 as mahsulotlar_soni,
+                            m.nomi as mahsulot_nomi,
+                            o.miqdor, m.birlik, o.kelish_narxi
+                        FROM ombor_kirim o
+                        JOIN mahsulotlar m ON o.mahsulot_id=m.id
+                        LEFT JOIN foydalanuvchilar f ON o.foydalanuvchi_id=f.id
+                        WHERE date(o.sana)>=? AND date(o.sana)<=?
+                    """, (bosh, tug)).fetchall()
+                    operatsiyalar += [dict(r) for r in rows]
+
+                # XARAJATLAR
+                if tur in ('barchasi','xarajat'):
+                    rows = conn.execute("""
+                        SELECT x.id, 'xarajat' as tur,
+                            'XRJ'||x.id as raqam,
+                            x.summa, '' as tolov_turi,
+                            '' as mijoz_ismi, x.sana,
+                            x.kategoriya as sabab,
+                            f.ism||' '||f.familiya as xodim,
+                            0 as mahsulotlar_soni,
+                            x.nomi as mahsulot_nomi
+                        FROM xarajatlar x
+                        LEFT JOIN foydalanuvchilar f ON x.foydalanuvchi_id=f.id
+                        WHERE date(x.sana)>=? AND date(x.sana)<=?
+                    """, (bosh, tug)).fetchall()
+                    operatsiyalar += [dict(r) for r in rows]
+
+                # Sana bo'yicha tartiblash (yangilari birinchi)
+                operatsiyalar.sort(key=lambda x: x.get('sana',''), reverse=True)
+                return self.send_json(operatsiyalar[:limit])
+
             if path == '/api/hisobot/umumiy':
                 bugun = datetime.now().strftime('%Y-%m-%d')
                 oy = datetime.now().strftime('%Y-%m')

@@ -53,6 +53,7 @@ function sahifaOch(nomi) {
     kassa: '🛒 Kassa / Sotuv',
     mahsulotlar: '🏪 Ombor / Mahsulotlar',
     hisobot: '📈 Hisobotlar',
+    jurnal: '📖 Jurnal',
     mijozlar: '👥 Mijozlar',
     xodimlar: '👔 HR / Xodimlar',
     sozlamalar: '⚙️ Sozlamalar'
@@ -72,6 +73,7 @@ function sahifaOch(nomi) {
     case 'mahsulotlar': mahsulotlarYukla('mahsulotlar'); break;
     case 'ombor': mahsulotlarYukla('ombor'); break;
     case 'hisobot': hisobotYukla(); break;
+    case 'jurnal': jurnalYukla(); break;
     case 'xodimlar': xodimlarYukla(); break;
     case 'mijozlar': mijozlarYukla(); break;
     case 'sozlamalar': sozlamalarYukla(); break;
