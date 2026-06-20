@@ -2,7 +2,8 @@ services:
   - type: web
     name: qurilish-dokoni
     env: python
-    buildCommand: pip install -r requirements.txt
+    plan: free
+    buildCommand: echo "build ok"
     startCommand: python server.py
     disk:
       name: dokoni-db
@@ -11,5 +12,3 @@ services:
     envVars:
       - key: RAILWAY_VOLUME_MOUNT_PATH
         value: /data
-      - key: PORT
-        value: 10000
