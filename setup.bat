@@ -1,138 +1,130 @@
 @echo off
 setlocal enabledelayedexpansion
-title Birinchi marta sozlash
+title Restoran Tizimi - Sozlash
 color 0B
 
 echo.
-echo  ========================================
-echo   RESTORAN TIZIMI - SOZLASH (SETUP)
-echo  ========================================
+echo  ============================================
+echo    RESTORAN BOSHQARUV TIZIMI - SOZLASH
+echo  ============================================
 echo.
 
-:: Python tekshirish
+:: ---- Python tekshirish ----
+echo  [1/5] Python tekshirilmoqda...
 python --version >nul 2>&1
 if errorlevel 1 (
+    echo.
     echo  [XATO] Python topilmadi!
-    echo  https://python.org/downloads dan yuklab o'rnating (3.10+)
-    pause & exit /b 1
+    echo  Quyidagi havoladan yuklab o'rnating:
+    echo  https://www.python.org/downloads/
+    echo.
+    echo  O'rnatishda "Add Python to PATH" ni belgilang!
+    echo.
+    pause
+    exit /b 1
 )
+for /f "tokens=*" %%v in ('python --version 2^>^&1') do echo  [OK] %%v
 
-:: Node.js tekshirish
+:: ---- Node.js tekshirish ----
+echo  [2/5] Node.js tekshirilmoqda...
 node --version >nul 2>&1
 if errorlevel 1 (
+    echo.
     echo  [XATO] Node.js topilmadi!
-    echo  https://nodejs.org dan yuklab o'rnating (18+)
-    pause & exit /b 1
-)
-
-echo  [OK] Python va Node.js mavjud.
-echo.
-
-:: ---- PostgreSQL yoki SQLite tanlash ----
-set USE_SQLITE=false
-pg_isready >nul 2>&1
-if errorlevel 1 (
-    echo  ----------------------------------------
-    echo   PostgreSQL topilmadi!
-    echo  ----------------------------------------
+    echo  Quyidagi havoladan yuklab o'rnating:
+    echo  https://nodejs.org/
     echo.
-    echo   [1] SQLite ishlatish  (tez, o'rnatish shart emas)
-    echo   [2] PostgreSQL o'rnatish  (professional)
-    echo.
-    set /p DB_CHOICE=  Tanlovingiz (1 yoki 2): 
-
-    if "!DB_CHOICE!"=="1" (
-        set USE_SQLITE=true
-        echo  [OK] SQLite tanlandi.
-    ) else (
-        echo.
-        echo  PostgreSQL yuklab olish:
-        echo  https://www.postgresql.org/download/windows/
-        echo  O'rnatib, qayta ishga tushiring.
-        pause & exit /b 1
-    )
-) else (
-    echo  [OK] PostgreSQL topildi.
+    pause
+    exit /b 1
 )
-echo.
+for /f "tokens=*" %%v in ('node --version 2^>^&1') do echo  [OK] Node.js %%v
 
-:: ---- .env sozlash ----
-echo  ----------------------------------------
-echo   Sozlamalar kiritish
-echo  ----------------------------------------
-echo.
-
-set DB_NAME=restaurant_db
-set DB_USER=postgres
-set DB_PASS=postgres
-
-if "!USE_SQLITE!"=="false" (
-    set /p DB_NAME=  DB nomi [restaurant_db]: 
-    set /p DB_USER=  DB user  [postgres]: 
-    set /p DB_PASS=  DB parol [postgres]: 
-    if "!DB_NAME!"=="" set DB_NAME=restaurant_db
-    if "!DB_USER!"=="" set DB_USER=postgres
-    if "!DB_PASS!"=="" set DB_PASS=postgres
-)
-
+:: ---- .env fayl yaratish (avtomatik, SQLite) ----
+echo  [3/5] Sozlamalar fayili yaratilmoqda...
 (
-echo SECRET_KEY=django-insecure-restoran-boshqaruv-2024
+echo SECRET_KEY=django-insecure-restoran-boshqaruv-tizimi-2024
 echo DEBUG=True
 echo ALLOWED_HOSTS=*
 echo.
-echo USE_SQLITE=!USE_SQLITE!
+echo USE_SQLITE=true
 echo.
-echo DB_NAME=!DB_NAME!
-echo DB_USER=!DB_USER!
-echo DB_PASSWORD=!DB_PASS!
+echo DB_NAME=restaurant_db
+echo DB_USER=postgres
+echo DB_PASSWORD=postgres
 echo DB_HOST=localhost
 echo DB_PORT=5432
 echo.
 echo CORS_ALLOWED_ORIGINS=http://localhost:3000
 ) > backend\.env
-
-echo  [OK] .env fayl saqlandi.
-echo.
+echo  [OK] .env fayl tayyor (SQLite ishlatiladi)
 
 :: ---- Virtual muhit ----
-echo  [1/4] Virtual muhit yaratilmoqda...
+echo  [4/5] Backend o'rnatilmoqda...
 if not exist "backend\venv" (
+    echo       Virtual muhit yaratilmoqda...
     python -m venv backend\venv
+    if errorlevel 1 (
+        echo  [XATO] Virtual muhit yaratilmadi!
+        pause & exit /b 1
+    )
 )
-echo  [OK] Tayyor.
 
-:: ---- Backend paketlar ----
-echo  [2/4] Backend paketlari o'rnatilmoqda...
 call backend\venv\Scripts\activate.bat
+
+echo       Paketlar o'rnatilmoqda (bir oz kuting)...
 pip install -r backend\requirements.txt -q --disable-pip-version-check
-echo  [OK] Tayyor.
+if errorlevel 1 (
+    echo  [XATO] Paketlar o'rnatilmadi!
+    pause & exit /b 1
+)
+echo  [OK] Backend paketlari tayyor
 
 :: ---- Migrations ----
-echo  [3/4] Ma'lumotlar bazasi yaratilmoqda...
+echo       Ma'lumotlar bazasi yaratilmoqda...
 cd backend
-python manage.py makemigrations --noinput
+python manage.py makemigrations --noinput >nul 2>&1
 python manage.py migrate --noinput
-echo.
+if errorlevel 1 (
+    echo  [XATO] Baza yaratilmadi!
+    cd ..
+    pause & exit /b 1
+)
 
-:: ---- Admin user ----
-echo  ----------------------------------------
-echo   Admin foydalanuvchi yarating:
-echo  ----------------------------------------
-python manage.py createsuperuser
+:: ---- Admin user avtomatik yaratish ----
+echo       Admin foydalanuvchi yaratilmoqda...
+python manage.py shell -c "from django.contrib.auth import get_user_model; U=get_user_model(); U.objects.filter(username='admin').exists() or U.objects.create_superuser('admin','admin@restoran.uz','admin123', first_name='Admin', last_name='User', role='admin')" >nul 2>&1
+echo  [OK] Admin yaratildi: login=admin  parol=admin123
 cd ..
 
 :: ---- Frontend ----
-echo.
-echo  [4/4] Frontend paketlari o'rnatilmoqda...
-cd frontend
-call npm install
-cd ..
+echo  [5/5] Frontend o'rnatilmoqda (bir oz kuting)...
+if not exist "frontend\node_modules" (
+    cd frontend
+    call npm install --silent
+    if errorlevel 1 (
+        echo  [XATO] Frontend paketlar o'rnatilmadi!
+        cd ..
+        pause & exit /b 1
+    )
+    cd ..
+)
+echo  [OK] Frontend tayyor
+
+:: ---- Logs papkasi ----
+if not exist "logs" mkdir logs
 
 echo.
-echo  ========================================
-echo   SOZLASH MUVAFFAQIYATLI YAKUNLANDI!
-echo  ========================================
+echo  ============================================
+echo    SOZLASH MUVAFFAQIYATLI YAKUNLANDI!
+echo  ============================================
 echo.
-echo   Endi start.bat ni ishga tushiring!
+echo   Kirish ma'lumotlari:
+echo   ----------------------------
+echo   Login:  admin
+echo   Parol:  admin123
+echo   ----------------------------
+echo.
+echo   Dasturni ishga tushirish uchun:
+echo   start.bat ga ikki marta bosing!
 echo.
 pause
