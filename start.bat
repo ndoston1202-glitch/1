@@ -1,4 +1,5 @@
 @echo off
+setlocal enabledelayedexpansion
 title Restoran Boshqaruv Tizimi
 color 0A
 
@@ -8,99 +9,102 @@ echo   RESTORAN BOSHQARUV TIZIMI
 echo  ========================================
 echo.
 
-:: ---- Python tekshirish ----
+:: Python tekshirish
 python --version >nul 2>&1
 if errorlevel 1 (
-    echo  [XATO] Python topilmadi! https://python.org dan yuklab oling.
-    pause
-    exit /b 1
+    echo  [XATO] Python topilmadi!
+    pause & exit /b 1
 )
 
-:: ---- Node.js tekshirish ----
+:: Node.js tekshirish
 node --version >nul 2>&1
 if errorlevel 1 (
-    echo  [XATO] Node.js topilmadi! https://nodejs.org dan yuklab oling.
-    pause
-    exit /b 1
+    echo  [XATO] Node.js topilmadi!
+    pause & exit /b 1
 )
-
-:: ---- PostgreSQL tekshirish ----
-pg_isready >nul 2>&1
-if errorlevel 1 (
-    echo  [OGOHLANTIRISH] PostgreSQL ishlamayapti yoki topilmadi.
-    echo  PostgreSQL ni ishga tushiring va qayta urinib koring.
-    pause
-    exit /b 1
-)
-
-echo  [OK] Barcha talablar mavjud.
-echo.
 
 :: ---- .env fayl tekshirish ----
 if not exist "backend\.env" (
-    echo  [INFO] .env fayl topilmadi, .env.example dan nusxa olinyapti...
-    copy "backend\.env.example" "backend\.env" >nul
-    echo  [MUHIM] backend\.env faylini oching va DB parolingizni kiriting!
-    notepad "backend\.env"
-    echo.
-    echo  Tayyor bo'lgach, istalgan tugmani bosing...
-    pause >nul
+    echo  [INFO] .env topilmadi. Avval setup.bat ni ishga tushiring!
+    pause & exit /b 1
 )
 
-:: ---- Virtual muhit ----
+:: USE_SQLITE ni .env dan o'qish
+set USE_SQLITE=false
+for /f "tokens=1,2 delims==" %%a in (backend\.env) do (
+    if "%%a"=="USE_SQLITE" set USE_SQLITE=%%b
+)
+
+:: ---- PostgreSQL tekshirish (faqat postgres tanlangan bo'lsa) ----
+if "!USE_SQLITE!"=="false" (
+    pg_isready >nul 2>&1
+    if errorlevel 1 (
+        echo  [XATO] PostgreSQL ishlamayapti!
+        echo.
+        echo  Yechim:
+        echo   - PostgreSQL ni ishga tushiring
+        echo   - Yoki setup.bat da SQLite tanlang
+        pause & exit /b 1
+    )
+    echo  [OK] PostgreSQL ulandi.
+) else (
+    echo  [OK] SQLite ishlatilmoqda.
+)
+
+echo  [OK] Barcha talablar tayyor.
+echo.
+
+:: ---- Virtual muhit tekshirish ----
 if not exist "backend\venv" (
-    echo  [1/5] Virtual muhit yaratilmoqda...
-    python -m venv backend\venv
+    echo  [XATO] Virtual muhit topilmadi!
+    echo  Avval setup.bat ni ishga tushiring.
+    pause & exit /b 1
 )
 
-:: ---- Paketlar ----
-echo  [2/5] Backend paketlari tekshirilmoqda...
+:: ---- Migration (yangilanishlar bo'lsa) ----
+echo  [1/3] Ma'lumotlar bazasi yangilanmoqda...
 call backend\venv\Scripts\activate.bat
-pip install -r backend\requirements.txt -q --disable-pip-version-check
-echo  [OK] Backend paketlari tayyor.
-
-:: ---- Migrations ----
-echo  [3/5] Ma'lumotlar bazasi sozlanmoqda...
 cd backend
-python manage.py makemigrations --noinput >nul 2>&1
-python manage.py migrate --noinput
+python manage.py migrate --noinput >nul 2>&1
 cd ..
-echo  [OK] Baza tayyor.
+echo  [OK] Tayyor.
 
 :: ---- Frontend paketlar ----
-echo  [4/5] Frontend paketlari tekshirilmoqda...
+echo  [2/3] Frontend tekshirilmoqda...
 if not exist "frontend\node_modules" (
-    cd frontend
-    npm install --silent
-    cd ..
+    echo  node_modules topilmadi, o'rnatilmoqda...
+    cd frontend & npm install --silent & cd ..
 )
-echo  [OK] Frontend paketlari tayyor.
+echo  [OK] Tayyor.
 
-:: ---- Ishga tushirish ----
-echo  [5/5] Serverlar ishga tushirilmoqda...
-echo.
-echo  ========================================
-echo   Backend:  http://localhost:8000
-echo   Frontend: http://localhost:3000
-echo   Admin:    http://localhost:8000/admin
-echo   API Docs: http://localhost:8000/api/docs
-echo  ========================================
+:: ---- Loglar papkasi ----
+if not exist "logs" mkdir logs
+
+echo  [3/3] Serverlar ishga tushirilmoqda...
 echo.
 
-:: Backend - alohida oynada
-start "Backend - Django" cmd /k "cd backend && venv\Scripts\activate && python manage.py runserver"
+:: ---- Backend - alohida oynada ----
+start "Backend - Django :8000" cmd /k "cd backend && venv\Scripts\activate && python manage.py runserver && pause"
 
-:: 2 soniya kutish
+:: ---- 2 soniya kutish ----
 timeout /t 2 /nobreak >nul
 
-:: Frontend - alohida oynada
-start "Frontend - React" cmd /k "cd frontend && npm run dev"
+:: ---- Frontend - alohida oynada ----
+start "Frontend - React :3000" cmd /k "cd frontend && npm run dev && pause"
 
-:: 3 soniya keyin brauzer ochish
-timeout /t 3 /nobreak >nul
+:: ---- 4 soniya keyin brauzer ochish ----
+timeout /t 4 /nobreak >nul
 start http://localhost:3000
 
-echo  [TAYYOR] Brauzer ochildi!
-echo  Dasturni toxtatish uchun stop.bat ni ishga tushiring.
+echo  ========================================
+echo   SERVERLAR ISHGA TUSHDI!
+echo  ========================================
+echo.
+echo   Frontend:  http://localhost:3000
+echo   Backend:   http://localhost:8000
+echo   Admin:     http://localhost:8000/admin
+echo   API Docs:  http://localhost:8000/api/docs
+echo.
+echo   Dasturni toxtatish uchun: stop.bat
 echo.
 pause

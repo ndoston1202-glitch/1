@@ -26,18 +26,25 @@ if ! command -v node &> /dev/null; then
     exit 1
 fi
 
-# ---- PostgreSQL tekshirish ----
-if ! command -v pg_isready &> /dev/null || ! pg_isready -q; then
-    echo -e "${YELLOW} [OGOHLANTIRISH] PostgreSQL ishlamayapti!${NC}"
-    echo " PostgreSQL ni ishga tushiring:"
-    echo "   Mac:   brew services start postgresql"
-    echo "   Linux: sudo systemctl start postgresql"
+# ---- PostgreSQL yoki SQLite tanlash ----
+USE_SQLITE="false"
+if ! command -v pg_isready &> /dev/null || ! pg_isready -q 2>/dev/null; then
+    echo -e "${YELLOW} [OGOHLANTIRISH] PostgreSQL topilmadi yoki ishlamayapti!${NC}"
     echo ""
-    read -p " Davom etishni xohlaysizmi? (y/n): " choice
-    [[ "$choice" != "y" ]] && exit 1
+    echo "  [1] SQLite ishlatish  (tez, o'rnatish shart emas)"
+    echo "  [2] Chiqish va PostgreSQL o'rnatish"
+    echo ""
+    read -p "  Tanlovingiz (1 yoki 2): " db_choice
+    if [ "$db_choice" == "1" ]; then
+        USE_SQLITE="true"
+        echo -e "${GREEN} [OK] SQLite tanlandi.${NC}"
+    else
+        echo "  PostgreSQL: https://www.postgresql.org/download"
+        exit 1
+    fi
+else
+    echo -e "${GREEN} [OK] PostgreSQL ulandi.${NC}"
 fi
-
-echo -e "${GREEN} [OK] Barcha talablar mavjud.${NC}"
 echo ""
 
 # ---- .env fayl ----
