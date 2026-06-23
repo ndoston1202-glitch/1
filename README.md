@@ -4,49 +4,35 @@ Django REST API + React (TypeScript) + PostgreSQL
 
 ---
 
-## 🚀 Ishga tushirish
+## 🚀 Ishga tushirish — BIR TUGMA!
 
-### Backend
+### 1-qadam: Birinchi marta sozlash (faqat bir marta)
 
-```bash
-cd backend
+| OS | Buyruq |
+|----|--------|
+| **Windows** | `setup.bat` ga ikki marta bosing |
+| **Mac/Linux** | `chmod +x setup.sh && ./setup.sh` |
 
-# Virtual muhit yaratish
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
+### 2-qadam: Ishga tushirish
 
-# Paketlarni o'rnatish
-pip install -r requirements.txt
+| OS | Buyruq |
+|----|--------|
+| **Windows** | `start.bat` ga ikki marta bosing |
+| **Mac/Linux** | `./start.sh` |
 
-# .env fayl yaratish
-cp .env.example .env
-# .env ichidagi ma'lumotlarni to'ldiring
+### To'xtatish
 
-# Ma'lumotlar bazasini sozlash (PostgreSQL)
-createdb restaurant_db
+| OS | Buyruq |
+|----|--------|
+| **Windows** | `stop.bat` |
+| **Mac/Linux** | `./stop.sh` |
 
-# Migrationlarni ishga tushirish
-python manage.py makemigrations
-python manage.py migrate
+### Qayta ishga tushirish
 
-# Superuser yaratish
-python manage.py createsuperuser
-
-# Serverni ishga tushirish
-python manage.py runserver
-```
-
-### Frontend
-
-```bash
-cd frontend
-
-# Paketlarni o'rnatish
-npm install
-
-# Ishga tushirish
-npm run dev
-```
+| OS | Buyruq |
+|----|--------|
+| **Windows** | `restart.bat` |
+| **Mac/Linux** | `./restart.sh` |
 
 ---
 
