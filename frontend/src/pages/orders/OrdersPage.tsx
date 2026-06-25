@@ -19,7 +19,10 @@ export default function OrdersPage() {
 
   const { data } = useQuery({
     queryKey: ['orders-count'],
-    queryFn: () => ordersApi.getOrders({ status: 'pending,confirmed,preparing,ready' }).then(r => r.data),
+    queryFn: async () => {
+      const r = await ordersApi.getOrders({})
+      return r.data
+    },
     refetchInterval: 15000,
   })
 

@@ -142,14 +142,14 @@ export default function NewOrderModal({ orderType, tableId, onClose }: Props) {
             </div>
           )}
           <div>
-            <label className="text-xs text-gray-500 font-medium">Mijoz ismi</label>
+            <label className="text-xs text-gray-500 font-medium">Mijoz ismi <span className="text-gray-400">(ixtiyoriy)</span></label>
             <input value={customerName} onChange={e => setCustomerName(e.target.value)}
-              className="w-full border rounded-lg px-2 py-1.5 text-sm mt-0.5" placeholder="Ism..." />
+              className="w-full border rounded-lg px-2 py-1.5 text-sm mt-0.5" placeholder="— kiritmasangiz ham bo'ladi —" />
           </div>
           <div>
-            <label className="text-xs text-gray-500 font-medium">Telefon</label>
+            <label className="text-xs text-gray-500 font-medium">Telefon <span className="text-gray-400">(ixtiyoriy)</span></label>
             <input value={customerPhone} onChange={e => setCustomerPhone(e.target.value)}
-              className="w-full border rounded-lg px-2 py-1.5 text-sm mt-0.5" placeholder="+998..." />
+              className="w-full border rounded-lg px-2 py-1.5 text-sm mt-0.5" placeholder="— ixtiyoriy —" />
           </div>
           {orderType === 'delivery' && (
             <div>
