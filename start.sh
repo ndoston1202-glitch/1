@@ -1,12 +1,11 @@
 #!/bin/bash
 
-# Ranglar
-RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
+RED='\033[0;31m'
 BOLD='\033[1m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
 echo ""
 echo -e "${CYAN}${BOLD} ========================================"
@@ -14,154 +13,121 @@ echo "   RESTORAN BOSHQARUV TIZIMI"
 echo -e " ========================================${NC}"
 echo ""
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "$SCRIPT_DIR"
+
 # ---- Python tekshirish ----
-if ! command -v python3 &> /dev/null; then
-    echo -e "${RED} [XATO] Python3 topilmadi! https://python.org dan yuklab oling.${NC}"
+if ! command -v python3 &>/dev/null; then
+    echo -e "${RED} [XATO] Python3 topilmadi!${NC}"
     exit 1
 fi
 
 # ---- Node.js tekshirish ----
-if ! command -v node &> /dev/null; then
-    echo -e "${RED} [XATO] Node.js topilmadi! https://nodejs.org dan yuklab oling.${NC}"
+if ! command -v node &>/dev/null; then
+    echo -e "${RED} [XATO] Node.js topilmadi!${NC}"
     exit 1
 fi
 
-# ---- PostgreSQL yoki SQLite tanlash ----
-USE_SQLITE="false"
-if ! command -v pg_isready &> /dev/null || ! pg_isready -q 2>/dev/null; then
-    echo -e "${YELLOW} [OGOHLANTIRISH] PostgreSQL topilmadi yoki ishlamayapti!${NC}"
-    echo ""
-    echo "  [1] SQLite ishlatish  (tez, o'rnatish shart emas)"
-    echo "  [2] Chiqish va PostgreSQL o'rnatish"
-    echo ""
-    read -p "  Tanlovingiz (1 yoki 2): " db_choice
-    if [ "$db_choice" == "1" ]; then
-        USE_SQLITE="true"
-        echo -e "${GREEN} [OK] SQLite tanlandi.${NC}"
-    else
-        echo "  PostgreSQL: https://www.postgresql.org/download"
-        exit 1
-    fi
-else
-    echo -e "${GREEN} [OK] PostgreSQL ulandi.${NC}"
-fi
-echo ""
-
-# ---- .env fayl ----
+# ---- .env avtomatik yaratish ----
 if [ ! -f "backend/.env" ]; then
-    echo -e "${YELLOW} [INFO] .env fayl topilmadi, yaratilmoqda...${NC}"
-    cp backend/.env.example backend/.env
-    echo ""
-    echo -e "${YELLOW} [MUHIM] backend/.env faylini tahrirlang:${NC}"
-    echo "   DB_NAME, DB_USER, DB_PASSWORD ni o'rnating"
-    echo ""
+    cat > backend/.env << 'EOF'
+SECRET_KEY=django-insecure-restoran-boshqaruv-tizimi-2024
+DEBUG=True
+ALLOWED_HOSTS=*
 
-    # Redaktorda ochish
-    if command -v nano &> /dev/null; then
-        read -p " nano da ochishni xohlaysizmi? (y/n): " open_env
-        [[ "$open_env" == "y" ]] && nano backend/.env
-    elif command -v open &> /dev/null; then
-        open backend/.env
-    fi
+USE_SQLITE=true
 
-    echo ""
-    read -p " .env tayyor bo'lgach Enter bosing..."
+DB_NAME=restaurant_db
+DB_USER=postgres
+DB_PASSWORD=postgres
+DB_HOST=localhost
+DB_PORT=5432
+
+CORS_ALLOWED_ORIGINS=http://localhost:3000
+EOF
+    echo -e "${GREEN} [OK] .env fayl yaratildi (SQLite)${NC}"
 fi
-
-# ---- Script papkasi ----
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-cd "$SCRIPT_DIR"
 
 # ---- Virtual muhit ----
 if [ ! -d "backend/venv" ]; then
-    echo -e "${CYAN} [1/5] Virtual muhit yaratilmoqda...${NC}"
+    echo -e "${CYAN} Virtual muhit yaratilmoqda...${NC}"
     python3 -m venv backend/venv
 fi
 
-# ---- Backend paketlar ----
-echo -e "${CYAN} [2/5] Backend paketlari tekshirilmoqda...${NC}"
 source backend/venv/bin/activate
+
+# ---- Paketlar ----
+echo -e "${CYAN} [1/3] Backend paketlari tekshirilmoqda...${NC}"
 pip install -r backend/requirements.txt -q --disable-pip-version-check
-echo -e "${GREEN} [OK] Backend paketlari tayyor.${NC}"
+echo -e "${GREEN} [OK] Tayyor${NC}"
 
 # ---- Migrations ----
-echo -e "${CYAN} [3/5] Ma'lumotlar bazasi sozlanmoqda...${NC}"
+echo -e "${CYAN} [2/3] Baza yangilanmoqda...${NC}"
 cd backend
-python manage.py makemigrations --noinput > /dev/null 2>&1
-python manage.py migrate --noinput
-cd ..
-echo -e "${GREEN} [OK] Baza tayyor.${NC}"
+python manage.py migrate --noinput > /dev/null 2>&1
 
-# ---- Frontend paketlar ----
-echo -e "${CYAN} [4/5] Frontend paketlari tekshirilmoqda...${NC}"
+# Admin yaratish
+python manage.py shell -c "
+from django.contrib.auth import get_user_model
+U = get_user_model()
+if not U.objects.filter(username='admin').exists():
+    U.objects.create_superuser('admin','admin@restoran.uz','admin123', first_name='Admin', last_name='User', role='admin')
+    print('Admin yaratildi')
+" 2>/dev/null
+
+cd ..
+echo -e "${GREEN} [OK] Tayyor${NC}"
+
+# ---- Frontend ----
 if [ ! -d "frontend/node_modules" ]; then
-    cd frontend
-    npm install --silent
-    cd ..
+    echo -e "${CYAN} Frontend paketlari o'rnatilmoqda...${NC}"
+    cd frontend && npm install --silent && cd ..
 fi
-echo -e "${GREEN} [OK] Frontend paketlari tayyor.${NC}"
 
-# ---- PID fayllar uchun papka ----
-mkdir -p .pids
-
-# ---- Backend ishga tushirish ----
-echo -e "${CYAN} [5/5] Serverlar ishga tushirilmoqda...${NC}"
-source backend/venv/bin/activate
-cd backend
-python manage.py runserver > ../logs/backend.log 2>&1 &
-BACKEND_PID=$!
-echo $BACKEND_PID > ../.pids/backend.pid
-cd ..
-
-# ---- Log papka ----
 mkdir -p logs
 
-# Backend qayta ishga tushirish (log papka bo'lmaganda xato bo'lishi mumkin)
-kill $BACKEND_PID > /dev/null 2>&1
+# ---- Eski processlarni o'ldirish ----
+lsof -ti:8000 | xargs kill -9 2>/dev/null
+lsof -ti:3000 | xargs kill -9 2>/dev/null
+sleep 1
+
+# ---- Backend ishga tushirish ----
+echo -e "${CYAN} [3/3] Serverlar ishga tushirilmoqda...${NC}"
 source backend/venv/bin/activate
 cd backend
 python manage.py runserver > ../logs/backend.log 2>&1 &
 BACKEND_PID=$!
-echo $BACKEND_PID > ../.pids/backend.pid
 cd ..
+echo -e "${GREEN} [OK] Backend ishga tushdi (PID: $BACKEND_PID)${NC}"
 
-# 2 soniya kutish
 sleep 2
 
 # ---- Frontend ishga tushirish ----
 cd frontend
 npm run dev > ../logs/frontend.log 2>&1 &
 FRONTEND_PID=$!
-echo $FRONTEND_PID > ../.pids/frontend.pid
 cd ..
+echo -e "${GREEN} [OK] Frontend ishga tushdi (PID: $FRONTEND_PID)${NC}"
 
-# 3 soniya kutish
 sleep 3
+
+# ---- Brauzer ochish ----
+if command -v xdg-open &>/dev/null; then
+    xdg-open http://localhost:3000
+elif command -v open &>/dev/null; then
+    open http://localhost:3000
+fi
 
 echo ""
 echo -e "${GREEN}${BOLD} ========================================"
-echo "   SERVERLAR ISHGA TUSHDI!"
+echo "   DASTUR ISHGA TUSHDI!"
 echo -e " ========================================${NC}"
 echo ""
-echo -e "  ${BOLD}Frontend:${NC}  http://localhost:3000"
-echo -e "  ${BOLD}Backend:${NC}   http://localhost:8000"
-echo -e "  ${BOLD}Admin:${NC}     http://localhost:8000/admin"
-echo -e "  ${BOLD}API Docs:${NC}  http://localhost:8000/api/docs"
+echo -e "  Brauzer:  http://localhost:3000"
+echo -e "  Admin:    http://localhost:8000/admin"
 echo ""
-echo -e "  Backend PID:  ${BACKEND_PID}"
-echo -e "  Frontend PID: ${FRONTEND_PID}"
+echo -e "  Login:    admin"
+echo -e "  Parol:    admin123"
 echo ""
-
-# ---- Brauzer ochish ----
-if command -v open &> /dev/null; then
-    open http://localhost:3000          # Mac
-elif command -v xdg-open &> /dev/null; then
-    xdg-open http://localhost:3000      # Linux
-fi
-
-echo -e "${YELLOW} Dasturni to'xtatish uchun: ./stop.sh${NC}"
-echo ""
-echo -e " Loglarni ko'rish:"
-echo "   Backend:  tail -f logs/backend.log"
-echo "   Frontend: tail -f logs/frontend.log"
+echo -e "${YELLOW}  To'xtatish uchun: ./stop.sh${NC}"
 echo ""
