@@ -1,5 +1,11 @@
 from rest_framework import serializers
-from .models import Category, MenuItem
+from .models import Category, MenuItem, Printer
+
+
+class PrinterSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Printer
+        fields = ['id', 'name', 'location', 'ip_address', 'is_active', 'created_at']
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -15,15 +21,16 @@ class CategorySerializer(serializers.ModelSerializer):
 
 class MenuItemSerializer(serializers.ModelSerializer):
     category_name = serializers.CharField(source='category.name', read_only=True)
+    printer_name = serializers.CharField(source='printer.name', read_only=True)
     profit = serializers.SerializerMethodField()
 
     class Meta:
         model = MenuItem
         fields = [
-            'id', 'category', 'category_name', 'name', 'description',
-            'price', 'cost_price', 'profit', 'image', 'is_available',
-            'preparation_time', 'calories', 'is_vegetarian', 'is_spicy',
-            'created_at', 'updated_at'
+            'id', 'category', 'category_name', 'printer', 'printer_name',
+            'name', 'description', 'price', 'cost_price', 'profit',
+            'image', 'is_available', 'preparation_time',
+            'calories', 'is_vegetarian', 'is_spicy', 'created_at', 'updated_at'
         ]
 
     def get_profit(self, obj):
@@ -32,14 +39,15 @@ class MenuItemSerializer(serializers.ModelSerializer):
 
 class MenuItemListSerializer(serializers.ModelSerializer):
     category_name = serializers.CharField(source='category.name', read_only=True)
+    printer_name = serializers.CharField(source='printer.name', read_only=True)
     profit = serializers.SerializerMethodField()
 
     class Meta:
         model = MenuItem
         fields = [
-            'id', 'category', 'category_name', 'name', 'price',
-            'cost_price', 'profit', 'image', 'is_available',
-            'preparation_time', 'is_vegetarian', 'is_spicy'
+            'id', 'category', 'category_name', 'printer', 'printer_name',
+            'name', 'price', 'cost_price', 'profit',
+            'image', 'is_available', 'preparation_time', 'is_vegetarian', 'is_spicy'
         ]
 
     def get_profit(self, obj):

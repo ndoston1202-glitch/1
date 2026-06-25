@@ -1,6 +1,22 @@
 from django.db import models
 
 
+class Printer(models.Model):
+    """Oshxona printerlari — har bir taom o'z printeriga chiqadi"""
+    name = models.CharField(max_length=100, verbose_name='Printer nomi')
+    location = models.CharField(max_length=100, blank=True, verbose_name='Joylashuv (Oshxona, Salat bar...)')
+    ip_address = models.CharField(max_length=50, blank=True, verbose_name='IP manzil')
+    is_active = models.BooleanField(default=True, verbose_name='Faol')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Printer'
+        verbose_name_plural = 'Printerlar'
+
+    def __str__(self):
+        return f"{self.name} ({self.location})"
+
+
 class Category(models.Model):
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True)
@@ -20,6 +36,10 @@ class Category(models.Model):
 
 class MenuItem(models.Model):
     category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name='items')
+    printer = models.ForeignKey(
+        Printer, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='menu_items', verbose_name='Printer (Oshxona)'
+    )
     name = models.CharField(max_length=200)
     description = models.TextField(blank=True)
     price = models.DecimalField(max_digits=10, decimal_places=2)

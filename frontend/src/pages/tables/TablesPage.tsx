@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { tablesApi } from '../../services/api'
+import { tablesApi, ordersApi } from '../../services/api'
 import { Plus, Users, MapPin, ClipboardList } from 'lucide-react'
 import toast from 'react-hot-toast'
 import Modal from '../../components/common/Modal'
@@ -103,6 +103,18 @@ export default function TablesPage() {
   const tables = tablesData?.results || tablesData || []
   const reservations = reservData?.results || reservData || []
 
+  const handleTableClick = async (table: Table) => {
+    try {
+      const res = await ordersApi.getOrders({ order_type: 'dine_in', table: table.id })
+      const orders = res.data?.results || res.data || []
+      const active = orders.find((o: any) => ['pending','confirmed','preparing','ready','served'].includes(o.status))
+      if (active) {
+        toast(`Stol #${table.number}: faol buyurtma #${active.order_number} mavjud`, { icon: '⚠️' })
+      }
+    } catch {}
+    setOrderTable(table)
+  }
+
   if (isLoading) return <LoadingSpinner />
 
   return (
@@ -140,7 +152,7 @@ export default function TablesPage() {
             <div key={table.id}
               className={`card cursor-pointer hover:shadow-lg transition-all border-2 ${STATUS_COLORS[table.status]} hover:scale-[1.02]`}>
               {/* Stol raqami - bosish → buyurtma */}
-              <div className="text-center mb-3" onClick={() => setOrderTable(table)}>
+              <div className="text-center mb-3" onClick={() => handleTableClick(table)}>
                 <div className="text-3xl font-bold text-gray-800">#{table.number}</div>
                 <div className="flex items-center justify-center gap-1 text-xs text-gray-500 mt-1">
                   <Users size={12} /> {table.capacity} kishi
@@ -157,7 +169,7 @@ export default function TablesPage() {
 
               {/* Buyurtma tugmasi */}
               <button
-                onClick={() => setOrderTable(table)}
+                onClick={() => handleTableClick(table)}
                 className="w-full py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs rounded-lg font-medium flex items-center justify-center gap-1.5 mb-2 transition-colors">
                 <ClipboardList size={13} /> Buyurtma
               </button>

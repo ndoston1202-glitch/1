@@ -53,7 +53,11 @@ export default function NewOrderModal({ orderType, tableId, onClose }: Props) {
   const addToCart = (item: MenuItem) => {
     setCart(prev => {
       const ex = prev.find(i => i.id === item.id)
-      if (ex) return prev.map(i => i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i)
+      if (ex) {
+        // Dublikat — miqdorini oshir, xabar ko'rsat
+        toast(`${item.name} — miqdori oshirildi`, { icon: '➕', duration: 1500 })
+        return prev.map(i => i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i)
+      }
       return [...prev, { id: item.id, name: item.name, price: item.price, quantity: 1 }]
     })
   }

@@ -1,6 +1,5 @@
 from rest_framework import serializers
 from .models import Order, OrderItem
-from apps.menu.serializers import MenuItemListSerializer
 
 
 class OrderItemSerializer(serializers.ModelSerializer):
@@ -8,15 +7,21 @@ class OrderItemSerializer(serializers.ModelSerializer):
     menu_item_price = serializers.DecimalField(
         source='menu_item.price', max_digits=10, decimal_places=2, read_only=True
     )
+    printer_name = serializers.SerializerMethodField()
     subtotal = serializers.ReadOnlyField()
 
     class Meta:
         model = OrderItem
         fields = [
             'id', 'menu_item', 'menu_item_name', 'menu_item_price',
-            'quantity', 'price', 'subtotal', 'status', 'notes'
+            'quantity', 'price', 'subtotal', 'status', 'notes', 'printer_name'
         ]
         read_only_fields = ['price']
+
+    def get_printer_name(self, obj):
+        if obj.menu_item.printer:
+            return obj.menu_item.printer.name
+        return None
 
 
 class OrderItemCreateSerializer(serializers.ModelSerializer):
@@ -50,6 +55,22 @@ class OrderCreateSerializer(serializers.ModelSerializer):
             'notes', 'discount', 'items'
         ]
 
+    def validate(self, attrs):
+        """1 stolga faqat 1 ta faol buyurtma bo'lishi mumkin"""
+        table = attrs.get('table')
+        if table:
+            active_statuses = ['pending', 'confirmed', 'preparing', 'ready', 'served']
+            existing = Order.objects.filter(
+                table=table,
+                status__in=active_statuses
+            ).first()
+            if existing:
+                raise serializers.ValidationError({
+                    'table': f'Stol #{table.number} da faol buyurtma mavjud! (#{existing.order_number}). '
+                             f'Avval mavjud buyurtmaga taom qo\'shing.'
+                })
+        return attrs
+
     def create(self, validated_data):
         items_data = validated_data.pop('items')
         request = self.context.get('request')
@@ -65,11 +86,20 @@ class OrderCreateSerializer(serializers.ModelSerializer):
 
         for item_data in items_data:
             menu_item = item_data['menu_item']
-            OrderItem.objects.create(
+            # Dublikat chek — bir xil taom bo'lsa miqdorini oshir
+            existing_item = OrderItem.objects.filter(
                 order=order,
-                price=menu_item.price,
-                **item_data
-            )
+                menu_item=menu_item
+            ).first()
+            if existing_item:
+                existing_item.quantity += item_data.get('quantity', 1)
+                existing_item.save()
+            else:
+                OrderItem.objects.create(
+                    order=order,
+                    price=menu_item.price,
+                    **item_data
+                )
 
         order.calculate_total()
         return order

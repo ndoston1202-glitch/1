@@ -3,8 +3,20 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
-from .models import Category, MenuItem
-from .serializers import CategorySerializer, MenuItemSerializer, MenuItemListSerializer
+from .models import Category, MenuItem, Printer
+from .serializers import CategorySerializer, MenuItemSerializer, MenuItemListSerializer, PrinterSerializer
+
+
+class PrinterListCreateView(generics.ListCreateAPIView):
+    queryset = Printer.objects.all()
+    serializer_class = PrinterSerializer
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['is_active']
+
+
+class PrinterDetailView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = Printer.objects.all()
+    serializer_class = PrinterSerializer
 
 
 class CategoryListCreateView(generics.ListCreateAPIView):

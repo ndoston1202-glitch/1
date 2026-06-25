@@ -51,6 +51,10 @@ export const authApi = {
 
 // Menu
 export const menuApi = {
+  printers: () => api.get('/menu/printers/'),
+  createPrinter: (data: any) => api.post('/menu/printers/', data),
+  updatePrinter: (id: number, data: any) => api.patch(`/menu/printers/${id}/`, data),
+  deletePrinter: (id: number) => api.delete(`/menu/printers/${id}/`),
   getCategories: () => api.get('/menu/categories/'),
   createCategory: (data: any) => api.post('/menu/categories/', data),
   updateCategory: (id: number, data: any) => api.patch(`/menu/categories/${id}/`, data),

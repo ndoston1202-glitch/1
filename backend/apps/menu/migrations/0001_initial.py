@@ -5,11 +5,21 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
 
     initial = True
-
-    dependencies = [
-    ]
+    dependencies = []
 
     operations = [
+        migrations.CreateModel(
+            name='Printer',
+            fields=[
+                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('name', models.CharField(max_length=100, verbose_name='Printer nomi')),
+                ('location', models.CharField(blank=True, max_length=100, verbose_name='Joylashuv')),
+                ('ip_address', models.CharField(blank=True, max_length=50, verbose_name='IP manzil')),
+                ('is_active', models.BooleanField(default=True, verbose_name='Faol')),
+                ('created_at', models.DateTimeField(auto_now_add=True)),
+            ],
+            options={'verbose_name': 'Printer', 'verbose_name_plural': 'Printerlar'},
+        ),
         migrations.CreateModel(
             name='Category',
             fields=[
@@ -34,16 +44,17 @@ class Migration(migrations.Migration):
                 ('name', models.CharField(max_length=200)),
                 ('description', models.TextField(blank=True)),
                 ('price', models.DecimalField(decimal_places=2, max_digits=10)),
-                ('cost_price', models.DecimalField(decimal_places=2, default=0, help_text="Tannarx (so'mda)", max_digits=10)),
+                ('cost_price', models.DecimalField(decimal_places=2, default=0, max_digits=10)),
                 ('image', models.ImageField(blank=True, null=True, upload_to='menu/')),
                 ('is_available', models.BooleanField(default=True)),
-                ('preparation_time', models.PositiveIntegerField(default=15, help_text='Tayyorlash vaqti (daqiqada)')),
+                ('preparation_time', models.PositiveIntegerField(default=15)),
                 ('calories', models.PositiveIntegerField(blank=True, null=True)),
                 ('is_vegetarian', models.BooleanField(default=False)),
                 ('is_spicy', models.BooleanField(default=False)),
                 ('created_at', models.DateTimeField(auto_now_add=True)),
                 ('updated_at', models.DateTimeField(auto_now=True)),
                 ('category', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='items', to='menu.category')),
+                ('printer', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='menu_items', to='menu.printer', verbose_name='Printer (Oshxona)')),
             ],
             options={
                 'verbose_name': 'Menyu elementi',

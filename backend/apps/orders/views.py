@@ -72,6 +72,14 @@ def add_order_item(request, pk):
     except MenuItem.DoesNotExist:
         return Response({'detail': 'Menyu elementi topilmadi'}, status=status.HTTP_404_NOT_FOUND)
 
+    # Dublikat chek — bir xil taom bo'lsa miqdorini oshir
+    existing = OrderItem.objects.filter(order=order, menu_item=menu_item).first()
+    if existing:
+        existing.quantity += quantity
+        existing.save()
+        order.calculate_total()
+        return Response(OrderItemSerializer(existing).data)
+
     item = OrderItem.objects.create(
         order=order,
         menu_item=menu_item,

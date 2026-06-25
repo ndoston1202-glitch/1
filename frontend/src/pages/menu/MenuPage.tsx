@@ -1,12 +1,13 @@
 import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { menuApi } from '../../services/api'
-import { Plus, Pencil, Trash2, Search, Leaf, Flame, Upload, ToggleLeft, ToggleRight, ChevronDown } from 'lucide-react'
+import { Plus, Pencil, Trash2, Search, Leaf, Flame, Upload, ToggleLeft, ToggleRight, ChevronDown, Printer } from 'lucide-react'
 import toast from 'react-hot-toast'
 import Modal from '../../components/common/Modal'
 import LoadingSpinner from '../../components/common/LoadingSpinner'
 import { useForm } from 'react-hook-form'
 import { MenuItem, Category } from '../../types'
+import PrinterPage from './PrinterPage'
 
 // ===================== TAOM FORMASI =====================
 function MenuItemForm({ initial, categories, onClose }: { initial?: MenuItem; categories: Category[]; onClose: () => void }) {
@@ -14,10 +15,16 @@ function MenuItemForm({ initial, categories, onClose }: { initial?: MenuItem; ca
   const [imgPreview, setImgPreview] = useState<string | null>(initial?.image || null)
   const fileRef = useRef<HTMLInputElement>(null)
 
+  const { data: printersData } = useQuery({
+    queryKey: ['printers'],
+    queryFn: () => menuApi.printers().then(r => r.data?.results || r.data),
+  })
+
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm({
     defaultValues: {
       name: initial?.name || '',
       category: initial?.category || '',
+      printer: (initial as any)?.printer || '',
       description: initial?.description || '',
       price: initial?.price || '',
       cost_price: (initial as any)?.cost_price || '0',
@@ -60,7 +67,7 @@ function MenuItemForm({ initial, categories, onClose }: { initial?: MenuItem; ca
         {errors.name && <p className="text-red-500 text-xs mt-1">Taom nomini kiriting</p>}
       </div>
 
-      {/* Kategoriya */}
+      {/* Kategoriya va Printer */}
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="label">Kategoriya</label>
@@ -73,15 +80,25 @@ function MenuItemForm({ initial, categories, onClose }: { initial?: MenuItem; ca
           </div>
         </div>
         <div>
-          <label className="label">Tayyorlash vaqti (daqiqa)</label>
-          <input type="number" {...register('preparation_time')} className="input" placeholder="15" />
+          <label className="label">
+            <span className="flex items-center gap-1"><Printer size={13} /> Printer (Oshxona)</span>
+          </label>
+          <div className="relative">
+            <select {...register('printer')} className="input appearance-none pr-8">
+              <option value="">— Printer tanlanmagan —</option>
+              {(printersData || []).map((p: any) => (
+                <option key={p.id} value={p.id}>{p.name} {p.location ? `(${p.location})` : ''}</option>
+              ))}
+            </select>
+            <ChevronDown size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+          </div>
         </div>
       </div>
 
-      {/* Narx, tannarx va kaloriya */}
+      {/* Narx, tannarx, vaqt */}
       <div className="grid grid-cols-3 gap-4">
         <div>
-          <label className="label">Sotish narxi (so'm) <span className="text-red-500">*</span></label>
+          <label className="label">Sotish narxi <span className="text-red-500">*</span></label>
           <input type="number" {...register('price', { required: true })} className="input" placeholder="0" />
           {errors.price && <p className="text-red-500 text-xs mt-1">Narxni kiriting</p>}
         </div>
@@ -90,8 +107,8 @@ function MenuItemForm({ initial, categories, onClose }: { initial?: MenuItem; ca
           <input type="number" {...register('cost_price')} className="input" placeholder="0" />
         </div>
         <div>
-          <label className="label">Kaloriya (ixtiyoriy)</label>
-          <input type="number" {...register('calories')} className="input" placeholder="kcal" />
+          <label className="label">Tayyorlash (daq)</label>
+          <input type="number" {...register('preparation_time')} className="input" placeholder="15" />
         </div>
       </div>
 
@@ -199,7 +216,7 @@ function CategoryForm({ initial, onClose }: { initial?: Category; onClose: () =>
 // ===================== ASOSIY SAHIFA =====================
 export default function MenuPage() {
   const qc = useQueryClient()
-  const [tab, setTab] = useState<'items' | 'categories'>('items')
+  const [tab, setTab] = useState<'items' | 'categories' | 'printers'>('items')
   const [search, setSearch] = useState('')
   const [selCat, setSelCat] = useState('')
   const [modalItem, setModalItem] = useState<MenuItem | null | 'new'>(null)
@@ -233,7 +250,7 @@ export default function MenuPage() {
       {/* Header tabs */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex gap-2">
-          {[{ key: 'items', label: '🍽️ Taomlar' }, { key: 'categories', label: '📂 Kategoriyalar' }].map(t => (
+          {[{ key: 'items', label: '🍽️ Taomlar' }, { key: 'categories', label: '📂 Kategoriyalar' }, { key: 'printers', label: '🖨️ Printerlar' }].map(t => (
             <button key={t.key} onClick={() => setTab(t.key as any)}
               className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${tab === t.key ? 'bg-amber-500 text-white shadow' : 'bg-white text-gray-600 hover:bg-gray-100 border'}`}>
               {t.label}
@@ -242,11 +259,13 @@ export default function MenuPage() {
         </div>
         {tab === 'items'
           ? <button onClick={() => setModalItem('new')} className="btn-primary flex items-center gap-2"><Plus size={16} /> Yangi taom</button>
-          : <button onClick={() => setModalCat('new')} className="btn-primary flex items-center gap-2"><Plus size={16} /> Yangi kategoriya</button>
+          : tab === 'categories'
+          ? <button onClick={() => setModalCat('new')} className="btn-primary flex items-center gap-2"><Plus size={16} /> Yangi kategoriya</button>
+          : null
         }
       </div>
 
-      {tab === 'items' ? (
+      {tab === 'items'  && (
         <>
           {/* Filter qator */}
           <div className="flex gap-3 flex-wrap bg-white border rounded-xl p-3">
@@ -277,6 +296,7 @@ export default function MenuPage() {
                     <th className="px-4 py-3 text-left text-gray-500 font-medium">Tannarx</th>
                     <th className="px-4 py-3 text-left text-gray-500 font-medium">Foyda</th>
                     <th className="px-4 py-3 text-left text-gray-500 font-medium">Vaqt</th>
+                    <th className="px-4 py-3 text-left text-gray-500 font-medium">Printer</th>
                     <th className="px-4 py-3 text-left text-gray-500 font-medium">Holat</th>
                     <th className="px-4 py-3 text-left text-gray-500 font-medium">Amallar</th>
                   </tr>
@@ -310,6 +330,14 @@ export default function MenuPage() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-gray-500">{item.preparation_time} daq</td>
+                      <td className="px-4 py-3">
+                        {(item as any).printer_name
+                          ? <span className="flex items-center gap-1 text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">
+                              <Printer size={10} /> {(item as any).printer_name}
+                            </span>
+                          : <span className="text-xs text-gray-400">—</span>
+                        }
+                      </td>
                       <td className="px-4 py-3">
                         <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${item.is_available ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
                           {item.is_available ? '✓ Mavjud' : '✗ Yo\'q'}
@@ -346,7 +374,9 @@ export default function MenuPage() {
             </div>
           )}
         </>
-      ) : (
+      )}
+
+      {tab === 'categories' && (
         <>
           <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
             <table className="w-full text-sm">
@@ -384,6 +414,8 @@ export default function MenuPage() {
           </div>
         </>
       )}
+
+      {tab === 'printers' && <PrinterPage />}
 
       {/* Modal - Taom */}
       <Modal isOpen={!!modalItem} onClose={() => setModalItem(null)}
