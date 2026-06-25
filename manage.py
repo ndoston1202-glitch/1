@@ -7,9 +7,7 @@ def main():
     try:
         from django.core.management import execute_from_command_line
     except ImportError as exc:
-        raise ImportError(
-            "Django o'rnatilmagan. requirements.txt o'rnatib qayta urinib ko'ring."
-        ) from exc
+        raise ImportError("Django o'rnatilmagan!") from exc
     execute_from_command_line(sys.argv)
 
 if __name__ == '__main__':
