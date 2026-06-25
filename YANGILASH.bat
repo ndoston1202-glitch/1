@@ -1,34 +1,54 @@
 @echo off
-title Restoran - Yangilanmoqda...
 cd /d "%~dp0"
+title Restoran - Yangilanmoqda...
 
-echo Serverlar to'xtatilmoqda...
+:: ===== SERVERLARNI TO'XTATISH =====
 for /f "tokens=5" %%a in ('netstat -aon 2^>nul ^| findstr ":8000 " ^| findstr "LISTENING"') do taskkill /PID %%a /F >nul 2>&1
 for /f "tokens=5" %%a in ('netstat -aon 2^>nul ^| findstr ":5173 " ^| findstr "LISTENING"') do taskkill /PID %%a /F >nul 2>&1
 for /f "tokens=5" %%a in ('netstat -aon 2^>nul ^| findstr ":3000 " ^| findstr "LISTENING"') do taskkill /PID %%a /F >nul 2>&1
-timeout /t 2 /nobreak >nul
+timeout /t 1 /nobreak >nul
 
-echo GitHub dan yangi kod yuklanmoqda...
+:: ===== GITHUB DAN YANGI KOD =====
 git fetch origin main >nul 2>&1
 git reset --hard origin/main >nul 2>&1
-echo [OK] Yangi kod yuklandi!
 
-echo Backend paketlari yangilanmoqda...
+:: ===== .ENV =====
+(
+echo SECRET_KEY=django-insecure-restoran-boshqaruv-tizimi-2024
+echo DEBUG=True
+echo ALLOWED_HOSTS=*
+echo USE_SQLITE=true
+echo DB_NAME=restaurant_db
+echo DB_USER=postgres
+echo DB_PASSWORD=postgres
+echo DB_HOST=localhost
+echo DB_PORT=5432
+echo CORS_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173
+) > backend\.env
+
+:: ===== VIRTUAL MUHIT =====
+if not exist "backend\venv" (
+    python -m venv backend\venv >nul 2>&1
+)
 call backend\venv\Scripts\activate.bat >nul 2>&1
+
+:: ===== BACKEND PAKETLAR =====
 pip install -r backend\requirements.txt -q --disable-pip-version-check >nul 2>&1
 
-echo Baza yangilanmoqda...
+:: ===== BAZA =====
 cd backend
 python manage.py migrate --run-syncdb >nul 2>&1
-cd ..
-echo [OK] Baza tayyor!
-
-echo Frontend yangilanmoqda...
-cd frontend
-npm install --legacy-peer-deps --silent >nul 2>&1
+python manage.py shell -c "from django.contrib.auth import get_user_model; U=get_user_model(); U.objects.filter(username='admin').exists() or U.objects.create_superuser('admin','admin@restoran.uz','admin123',first_name='Admin',last_name='User',role='admin')" >nul 2>&1
 cd ..
 
-echo Serverlar ishga tushirilmoqda...
+:: ===== FRONTEND PAKETLAR =====
+if not exist "frontend\node_modules" (
+    cd frontend
+    npm install --legacy-peer-deps --silent >nul 2>&1
+    cd ..
+)
+
+:: ===== SERVERLARNI ISHGA TUSHIRISH =====
 set BACK=%~dp0backend
 start /min "BACKEND" cmd /c "cd /d "%BACK%" && venv\Scripts\activate && python manage.py runserver"
 timeout /t 4 /nobreak >nul
