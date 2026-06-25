@@ -11,7 +11,7 @@ class CategoryAdmin(admin.ModelAdmin):
 
 @admin.register(MenuItem)
 class MenuItemAdmin(admin.ModelAdmin):
-    list_display = ['name', 'category', 'price', 'is_available', 'preparation_time']
-    list_editable = ['price', 'is_available']
+    list_display = ['name', 'category', 'price', 'cost_price', 'is_available', 'preparation_time']
+    list_editable = ['price', 'cost_price', 'is_available']
     list_filter = ['category', 'is_available', 'is_vegetarian', 'is_spicy']
     search_fields = ['name', 'description']

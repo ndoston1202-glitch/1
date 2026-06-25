@@ -15,20 +15,32 @@ class CategorySerializer(serializers.ModelSerializer):
 
 class MenuItemSerializer(serializers.ModelSerializer):
     category_name = serializers.CharField(source='category.name', read_only=True)
+    profit = serializers.SerializerMethodField()
 
     class Meta:
         model = MenuItem
         fields = [
             'id', 'category', 'category_name', 'name', 'description',
-            'price', 'image', 'is_available', 'preparation_time',
-            'calories', 'is_vegetarian', 'is_spicy', 'created_at', 'updated_at'
+            'price', 'cost_price', 'profit', 'image', 'is_available',
+            'preparation_time', 'calories', 'is_vegetarian', 'is_spicy',
+            'created_at', 'updated_at'
         ]
+
+    def get_profit(self, obj):
+        return float(obj.price) - float(obj.cost_price)
 
 
 class MenuItemListSerializer(serializers.ModelSerializer):
     category_name = serializers.CharField(source='category.name', read_only=True)
+    profit = serializers.SerializerMethodField()
 
     class Meta:
         model = MenuItem
-        fields = ['id', 'category', 'category_name', 'name', 'price',
-                  'image', 'is_available', 'preparation_time', 'is_vegetarian', 'is_spicy']
+        fields = [
+            'id', 'category', 'category_name', 'name', 'price',
+            'cost_price', 'profit', 'image', 'is_available',
+            'preparation_time', 'is_vegetarian', 'is_spicy'
+        ]
+
+    def get_profit(self, obj):
+        return float(obj.price) - float(obj.cost_price)

@@ -20,6 +20,7 @@ function MenuItemForm({ initial, categories, onClose }: { initial?: MenuItem; ca
       category: initial?.category || '',
       description: initial?.description || '',
       price: initial?.price || '',
+      cost_price: (initial as any)?.cost_price || '0',
       preparation_time: initial?.preparation_time || 15,
       calories: initial?.calories || '',
       is_available: initial?.is_available ?? true,
@@ -77,12 +78,16 @@ function MenuItemForm({ initial, categories, onClose }: { initial?: MenuItem; ca
         </div>
       </div>
 
-      {/* Narx va kaloriya */}
-      <div className="grid grid-cols-2 gap-4">
+      {/* Narx, tannarx va kaloriya */}
+      <div className="grid grid-cols-3 gap-4">
         <div>
-          <label className="label">Narx (so'm) <span className="text-red-500">*</span></label>
+          <label className="label">Sotish narxi (so'm) <span className="text-red-500">*</span></label>
           <input type="number" {...register('price', { required: true })} className="input" placeholder="0" />
           {errors.price && <p className="text-red-500 text-xs mt-1">Narxni kiriting</p>}
+        </div>
+        <div>
+          <label className="label">Tannarx (so'm)</label>
+          <input type="number" {...register('cost_price')} className="input" placeholder="0" />
         </div>
         <div>
           <label className="label">Kaloriya (ixtiyoriy)</label>
@@ -269,6 +274,8 @@ export default function MenuPage() {
                     <th className="px-4 py-3 text-left text-gray-500 font-medium">Taom nomi</th>
                     <th className="px-4 py-3 text-left text-gray-500 font-medium">Kategoriya</th>
                     <th className="px-4 py-3 text-left text-gray-500 font-medium">Narx</th>
+                    <th className="px-4 py-3 text-left text-gray-500 font-medium">Tannarx</th>
+                    <th className="px-4 py-3 text-left text-gray-500 font-medium">Foyda</th>
                     <th className="px-4 py-3 text-left text-gray-500 font-medium">Vaqt</th>
                     <th className="px-4 py-3 text-left text-gray-500 font-medium">Holat</th>
                     <th className="px-4 py-3 text-left text-gray-500 font-medium">Amallar</th>
@@ -296,6 +303,12 @@ export default function MenuPage() {
                         <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-xs font-medium">{item.category_name}</span>
                       </td>
                       <td className="px-4 py-3 font-bold text-amber-600">{Number(item.price).toLocaleString()} so'm</td>
+                      <td className="px-4 py-3 text-gray-500">{Number((item as any).cost_price || 0).toLocaleString()} so'm</td>
+                      <td className="px-4 py-3">
+                        <span className="font-semibold text-green-600">
+                          {(Number(item.price) - Number((item as any).cost_price || 0)).toLocaleString()} so'm
+                        </span>
+                      </td>
                       <td className="px-4 py-3 text-gray-500">{item.preparation_time} daq</td>
                       <td className="px-4 py-3">
                         <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${item.is_available ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>

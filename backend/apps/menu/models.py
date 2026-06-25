@@ -23,6 +23,7 @@ class MenuItem(models.Model):
     name = models.CharField(max_length=200)
     description = models.TextField(blank=True)
     price = models.DecimalField(max_digits=10, decimal_places=2)
+    cost_price = models.DecimalField(max_digits=10, decimal_places=2, default=0, help_text='Tannarx (so\'mda)')
     image = models.ImageField(upload_to='menu/', null=True, blank=True)
     is_available = models.BooleanField(default=True)
     preparation_time = models.PositiveIntegerField(default=15, help_text='Tayyorlash vaqti (daqiqada)')
